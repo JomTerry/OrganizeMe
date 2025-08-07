@@ -1,4 +1,4 @@
-# 🚀 Quick Publish to GitHub
+# 🚀 Quick Publish to GitHub - Kevin Lim
 
 ## Super Quick Method (30 seconds):
 
@@ -19,22 +19,3 @@
 ```bash
 ./publish-to-github.sh
 ```
-
-## What happens after publishing:
-- ✅ Your repository goes live instantly
-- ✅ Complete React Native app visible on GitHub
-- ✅ Professional README displays automatically
-- ✅ Others can clone and run your app
-- ✅ Ready for contributions and stars
-
-## Your repository will include:
-- 📱 Complete task management app
-- 🔐 Authentication system
-- 📋 Task CRUD with priorities
-- 🔔 Reminder notifications
-- ⚙️ Settings and profile
-- 📚 Comprehensive documentation
-- 🎨 Modern UI/UX
-- 🛠️ TypeScript + SQLite
-
-**That's it! Your OrganizeMe app will be live on GitHub! 🎉**
