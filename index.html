@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OrganizeMe Loader</title>
+</head>
+<body>
+  <h1>OrganizeMe Contents</h1>
+  <ul id="file-list">Loading…</ul>
+
+  <script>
+    // ─── CONFIGURATION ALREADY SET FOR YOUR REPO ───
+    const OWNER  = 'JomTerry';       // your GitHub username/org
+    const REPO   = 'OrganizeMe';     // this repo’s name
+    const BRANCH = 'main';           // default branch
+    const FOLDER = 'OrganizeMe';     // folder to load
+    // ───────────────────────────────────────────────
+
+    const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
+    const listEl = document.getElementById('file-list');
+
+    fetch(apiUrl)
+      .then(res => {
+        if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        const entries = data.tree
+          .filter(item => item.path.startsWith(`${FOLDER}/`) && item.type === 'blob');
+
+        if (entries.length === 0) {
+          listEl.textContent = `⚠️ No files found in “${FOLDER}/”`;
+          return;
+        }
+
+        listEl.textContent = ''; // clear “Loading…”
+        entries.forEach(item => {
+          const filePath = item.path;
+          const fileName = filePath.split('/').pop();
+          const rawUrl   = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
+
+          // 1) link to view/download
+          const li = document.createElement('li');
+          const a  = document.createElement('a');
+          a.href        = rawUrl;
+          a.textContent = fileName;
+          a.target      = '_blank';
+          li.appendChild(a);
+          listEl.appendChild(li);
+
+          // 2) if it’s JS, auto-inject so it runs
+          if (fileName.endsWith('.js')) {
+            const script = document.createElement('script');
+            script.src = rawUrl;
+            document.body.appendChild(script);
+          }
+        });
+      })
+      .catch(err => {
+        listEl.textContent = '❌ Failed to load folder contents.';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
