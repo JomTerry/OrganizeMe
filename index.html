@@ -2,62 +2,88 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>OrganizeMe Loader</title>
+  <title>OrganizeMe Runner</title>
 </head>
 <body>
-  <h1>OrganizeMe Contents</h1>
-  <ul id="file-list">Loading…</ul>
+  <h1>OrganizeMe Runner</h1>
+  <div id="output">Loading OrganizeMe…</div>
 
   <script>
-    // ─── CONFIGURATION ALREADY SET FOR YOUR REPO ───
-    const OWNER  = 'JomTerry';       // your GitHub username/org
-    const REPO   = 'OrganizeMe';     // this repo’s name
-    const BRANCH = 'main';           // default branch
-    const FOLDER = 'OrganizeMe';     // folder to load
-    // ───────────────────────────────────────────────
+    // ─── CONFIGURATION ───────────────────────────────
+    const OWNER  = 'JomTerry';
+    const REPO   = 'OrganizeMe';
+    const BRANCH = 'main';
+    const FOLDER = 'OrganizeMe';
+    // ─────────────────────────────────────────────────
 
     const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
-    const listEl = document.getElementById('file-list');
+    const output = document.getElementById('output');
 
     fetch(apiUrl)
       .then(res => {
-        if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+        if (!res.ok) throw new Error(`GitHub API ${res.status}`);
         return res.json();
       })
       .then(data => {
-        const entries = data.tree
-          .filter(item => item.path.startsWith(`${FOLDER}/`) && item.type === 'blob');
+        // grab only the blobs inside your folder
+        const files = data.tree.filter(item =>
+          item.type === 'blob' && item.path.startsWith(`${FOLDER}/`)
+        );
 
-        if (entries.length === 0) {
-          listEl.textContent = `⚠️ No files found in “${FOLDER}/”`;
+        if (files.length === 0) {
+          output.textContent = `⚠️ No files found in ${FOLDER}/`;
           return;
         }
 
-        listEl.textContent = ''; // clear “Loading…”
-        entries.forEach(item => {
-          const filePath = item.path;
-          const fileName = filePath.split('/').pop();
-          const rawUrl   = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
+        // clear the “Loading…” text
+        output.textContent = '';
 
-          // 1) link to view/download
-          const li = document.createElement('li');
-          const a  = document.createElement('a');
-          a.href        = rawUrl;
-          a.textContent = fileName;
-          a.target      = '_blank';
-          li.appendChild(a);
-          listEl.appendChild(li);
+        files.forEach(item => {
+          const path = item.path;            // e.g. "OrganizeMe/app.js"
+          const ext  = path.slice(path.lastIndexOf('.')).toLowerCase();
 
-          // 2) if it’s JS, auto-inject so it runs
-          if (fileName.endsWith('.js')) {
-            const script = document.createElement('script');
-            script.src = rawUrl;
-            document.body.appendChild(script);
+          switch (ext) {
+            case '.js':
+              // inject & run JS
+              const script = document.createElement('script');
+              script.src = path;
+              document.body.appendChild(script);
+              break;
+
+            case '.css':
+              // inject stylesheet
+              const link = document.createElement('link');
+              link.rel  = 'stylesheet';
+              link.href = path;
+              document.head.appendChild(link);
+              break;
+
+            case '.html':
+              // render HTML in an iframe
+              const wrapper = document.createElement('div');
+              wrapper.style.margin = '1em 0';
+              const title = document.createElement('h2');
+              title.textContent = path.split('/').pop();
+              const iframe = document.createElement('iframe');
+              iframe.src    = path;
+              iframe.width  = '100%';
+              iframe.height = '400';
+              iframe.style.border = '1px solid #ccc';
+              wrapper.appendChild(title);
+              wrapper.appendChild(iframe);
+              output.appendChild(wrapper);
+              break;
+
+            default:
+              // for any other files, just link to them
+              const p = document.createElement('p');
+              p.innerHTML = `<a href="${path}" target="_blank">${path.split('/').pop()}</a>`;
+              output.appendChild(p);
           }
         });
       })
       .catch(err => {
-        listEl.textContent = '❌ Failed to load folder contents.';
+        output.textContent = '❌ Failed to load OrganizeMe folder.';
         console.error(err);
       });
   </script>
