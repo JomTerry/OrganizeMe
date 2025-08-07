@@ -1,254 +1,482 @@
-# OrganizeMe - Complete Project Documentation
-
-## 📱 App Overview
-
-**OrganizeMe** is a lightweight Android task management app designed specifically for IBDP (International Baccalaureate Diploma Programme) students. The app helps students like Mr. Mivan organize their tasks, track deadlines, and prioritize their workload effectively.
-
-### Core Problem
-IBDP students juggle numerous assignments, projects, and deadlines across multiple subjects, often forgetting tasks or struggling to prioritize what to do next.
-
-### MVP Solution
-A simple, offline-first Android app that allows students to:
-- Quickly add tasks with deadlines and importance levels
-- Automatically sort tasks by priority and urgency
-- Receive timely notifications for upcoming deadlines
-- Mark tasks as complete with satisfying interactions
-- Toggle between priority-based and date-based views
-
-## 🏗️ Technical Architecture
-
-### Tech Stack
-- **Frontend**: Kivy + KivyMD for native Android UI
-- **Backend**: Python for application logic
-- **Database**: SQLite for local data storage
-- **Notifications**: Plyer for cross-platform notifications
-- **Build**: Buildozer for Android APK generation
-
-### Key Design Decisions
-1. **Offline-First**: All data stored locally for instant access and privacy
-2. **Material Design**: Following Material Design 3 principles for familiar UX
-3. **Automatic Sorting**: Intelligent task prioritization based on deadline and importance
-4. **Minimal Setup**: No account creation or complex configuration required
-
-## 📋 MVP Success Criteria
-
-✅ **Essential Features Delivered:**
-1. **Add Task**: Name, optional description, due date, importance (High/Medium/Low), optional reminder
-2. **Auto-Sort**: Tasks grouped under High, Medium, Low priority based on deadline and chosen importance
-3. **Mark Done**: Tap to complete a task and move it out of main list
-4. **Reminders**: Optional notifications at user-chosen times
-5. **Offline-First**: Everything stored locally in SQLite
-6. **Simple UI**: One screen to add tasks, one screen to view them by priority
-7. **View Toggle**: Switch between priority view and date view
-
-## 📚 Documentation Structure
-
-### 1. User Experience Documentation
-- **[User Flows](docs/user_flows.md)**: Detailed step-by-step user interactions
-- **[Wireframes](docs/wireframes.md)**: Complete UI mockups for all screens
-- **[Error Handling](docs/error_handling.md)**: Edge cases and recovery scenarios
-
-### 2. Technical Documentation  
-- **[Data Model](docs/data_model.md)**: Database schema, ER diagrams, and queries
-- **[Notifications](docs/notifications.md)**: Scheduling algorithms and system integration
-- **[Test Plan](docs/test_plan.md)**: Comprehensive testing strategy and test cases
-
-### 3. Implementation Ready
-- **Project Structure**: Organized codebase with clear separation of concerns
-- **Requirements**: All dependencies specified and version-locked
-- **Build Configuration**: Ready for Android APK generation
-
-## 🎯 Key Features Deep Dive
-
-### Smart Task Prioritization
-The app uses a sophisticated algorithm that considers:
-- User-assigned importance (High/Medium/Low)
-- Due date proximity
-- Time until deadline
-- Overdue status
-
-Tasks are automatically sorted to show users exactly "what to do next."
-
-### Intelligent Notifications
-- **Adaptive Timing**: Reminders scheduled based on task priority and user behavior
-- **Batch Management**: Prevents notification spam with smart grouping
-- **Graceful Degradation**: Works with or without notification permissions
-
-### Accessibility & Usability
-- **Minimum 44dp touch targets** for easy interaction
-- **Screen reader support** with descriptive labels
-- **High contrast mode** for visual accessibility
-- **Multiple completion methods** (swipe or tap)
-
-## 🔧 Implementation Roadmap
-
-### Phase 1: Core MVP (Weeks 1-2)
-1. ✅ Project setup and structure
-2. ✅ Database schema design
-3. ⏳ Basic UI implementation
-4. ⏳ Task CRUD operations
-5. ⏳ Sorting and filtering logic
-
-### Phase 2: Enhanced Features (Weeks 3-4)
-6. ⏳ Notification system
-7. ⏳ View mode toggling
-8. ⏳ Error handling and validation
-9. ⏳ Performance optimization
-10. ⏳ Comprehensive testing
-
-### Phase 3: Polish & Deploy (Week 5)
-11. ⏳ UI/UX refinements
-12. ⏳ Accessibility improvements
-13. ⏳ APK generation and testing
-14. ⏳ Documentation finalization
-15. ⏳ Deployment preparation
-
-## 🧪 Quality Assurance
-
-### Testing Strategy
-- **70% Unit Tests**: Individual component verification
-- **20% Integration Tests**: Component interaction testing  
-- **10% End-to-End Tests**: Complete user journey validation
-
-### Coverage Areas
-- ✅ Functional testing for all features
-- ✅ Performance testing with large datasets
-- ✅ Security testing for data protection
-- ✅ Compatibility testing across Android versions
-- ✅ Accessibility testing for inclusive design
-
-## 🔒 Privacy & Security
-
-### Data Protection
-- **Local Storage Only**: No cloud sync, complete user control
-- **Input Validation**: Prevents injection attacks and malformed data
-- **Permission Management**: Graceful degradation when permissions denied
-- **GDPR Compliant**: No personal data collection or tracking
-
-## 📊 Performance Targets
-
-### Benchmarks
-- **App Launch**: <2 seconds cold start
-- **Task Creation**: <500ms from tap to save
-- **List Loading**: <1 second for 1000+ tasks
-- **Sorting**: <2 seconds for 10,000 tasks
-- **Database Queries**: <100ms for complex operations
-
-### Optimization Strategies
-- Efficient SQLite indexing
-- Lazy loading for large datasets
-- Background processing for notifications
-- Memory management for smooth UI
-
-## 🎨 Design System
-
-### Visual Identity
-- **Primary Color**: #6200EE (Purple) - Professional and calming
-- **Priority Colors**: 
-  - High: #FF5722 (Deep Orange) - Urgent attention
-  - Medium: #FF9800 (Orange) - Moderate attention
-  - Low: #4CAF50 (Green) - Relaxed completion
-- **Typography**: Roboto family for Android consistency
-
-### Interaction Patterns
-- **Swipe Right**: Mark task complete (intuitive gesture)
-- **Long Press**: Access context menu (power user feature)
-- **Pull to Refresh**: Update task list (standard pattern)
-- **FAB**: Primary action (add new task)
-
-## 🚀 Future Enhancements
-
-### Potential v2.0 Features
-- **Cloud Sync**: Optional backup and multi-device sync
-- **Collaboration**: Share tasks with study groups
-- **Analytics**: Personal productivity insights
-- **Widgets**: Home screen task preview
-- **Voice Input**: Quick task creation via speech
-- **Calendar Integration**: Sync with Google Calendar
-- **Themes**: Additional color schemes and dark mode
-
-### Scalability Considerations
-- Database designed for millions of tasks
-- Modular architecture for easy feature addition
-- Internationalization support ready
-- Plugin system for custom extensions
-
-## 📈 Success Metrics
-
-### User Engagement
-- **Daily Active Users**: Target 80% of installed base
-- **Task Completion Rate**: Target 70% of created tasks
-- **Session Length**: Target 2-3 minutes per session
-- **Retention**: Target 60% after 30 days
-
-### Technical Performance  
-- **Crash Rate**: <1% of sessions
-- **ANR Rate**: <0.1% of sessions
-- **Battery Usage**: <2% per day with normal use
-- **Storage Usage**: <50MB including data
-
-## 🤝 Development Team Roles
-
-### Recommended Team Structure
-- **Product Manager**: Requirements and user experience
-- **Android Developer**: Kivy/Python implementation
-- **UI/UX Designer**: Visual design and usability
-- **QA Engineer**: Testing and quality assurance
-- **DevOps Engineer**: Build and deployment automation
-
-## 📞 Support & Maintenance
-
-### Ongoing Responsibilities
-- **Bug Fixes**: Regular updates for stability
-- **OS Compatibility**: Support new Android versions
-- **Performance Monitoring**: Track and optimize metrics
-- **User Feedback**: Incorporate user suggestions
-- **Security Updates**: Address vulnerabilities promptly
-
-## 🎓 Educational Value
-
-### Learning Outcomes
-This project demonstrates:
-- **Mobile App Development**: Cross-platform development with Python
-- **Database Design**: Relational modeling and optimization
-- **User Experience**: Human-centered design principles
-- **Software Testing**: Comprehensive quality assurance
-- **Project Management**: Agile development practices
-
-### Skills Developed
-- Python programming with Kivy framework
-- SQLite database management
-- Android app architecture
-- Material Design implementation
-- Test-driven development
-- Documentation and technical writing
-
----
-
-## 📁 File Structure Summary
-
-```
-OrganizeMe/
-├── 📄 README.md                    # Project overview and setup
-├── 📄 requirements.txt             # Python dependencies
-├── 📄 PROJECT_SUMMARY.md          # This comprehensive summary
-├── 🗂️ docs/                       # Complete documentation
-│   ├── 📄 user_flows.md           # User interaction flows
-│   ├── 📄 wireframes.md           # UI mockups and layouts
-│   ├── 📄 data_model.md           # Database design
-│   ├── 📄 notifications.md        # Notification system
-│   ├── 📄 error_handling.md       # Error scenarios
-│   └── 📄 test_plan.md            # Testing strategy
-├── 🗂️ models/                     # Data layer (to be implemented)
-├── 🗂️ screens/                    # UI screens (to be implemented)
-├── 🗂️ utils/                      # Utility functions (to be implemented)
-└── 🗂️ assets/                     # Icons and images (to be implemented)
-```
-
-## ✨ Conclusion
-
-The OrganizeMe app represents a complete, well-documented solution for IBDP student task management. With comprehensive planning, detailed technical specifications, and thorough testing strategies, this project is ready for implementation and deployment.
-
-The documentation provides everything needed to build, test, and maintain a high-quality mobile application that truly solves the target user's problems while demonstrating best practices in software development.
-
-**Ready to build? All the blueprints are here! 🚀**
+Criterion A: Planning
+Statement of the Problem
+My client, Mr. Mivan, is an IBDP student. Like many students in the IB program, he often has a
+lot of work to do at the same time. He needs to finish school assignments, study for tests, and
+also manage other activities like sports or volunteering. He told me that he sometimes forgets
+about tasks or doesn’t know which one to do first.
+Mr. Mivan has tried using to-do list apps, but they are too simple. They let him write down tasks,
+but they don’t tell him which ones are more important or more urgent. He also tried apps like
+Trello and Notion, but he said they are too complicated and hard to use.
+I suggested making a simple mobile app just for students like him. The app will help him
+organize his tasks in order of importance. He can add a task, set the deadline, and choose how
+important it is. The app will then arrange the tasks from most important to least important, and
+remind him when a task is coming up. Mivan liked this idea and said it would help him stay more
+organized and less stressed.
+Because Mr. Mivan uses an Android phone, I will build the app for Android only.
+Rationale
+The goal of this project is to make a lightweight and simple mobile app for Android that helps
+students stay organized and reduce stress. The app will allow users to input their tasks, choose
+a due date, and mark how important the task is. After that, the app will automatically sort the
+tasks by importance and urgency. This helps the user see which task they should do first.
+The app will use a basic idea based on the Eisenhower Matrix, which helps people decide what
+to do based on two things:
+●
+How urgent the task is (based on the deadline)
+●
+How important the task is (the user chooses this)
+Using this, the app will automatically sort tasks into High, Medium, or Low priority.
+To build the app, I will use:
+●
+Python – the main programming language
+●
+Kivy – to build the app for Android
+●
+●
+●
+Kivymd – to add buttons and layouts that look clean and modern
+SQLite – to store the tasks on the phone
+Datetime – to help with sorting tasks by deadline and sending reminders
+The user can input:
+●
+Task name
+●
+●
+Description (optional)
+Due date
+●
+●
+Importance (High, Medium, Low)
+Reminder on/off (optional)
+The app will also let users mark tasks as done, and see their progress. Since the data is saved
+on the device, the app can be used even without the internet.
+Success Criteria
+The app will be successful if it meets these points:
+1. 2. 3. 4. 5. 6. 7. 8. The user can add a task with a name, deadline, and importance level
+The app automatically sorts tasks by urgency and importance
+Tasks are shown under High, Medium, or Low priority sections
+The user gets reminders (optional feature)
+The user can mark a task as complete
+The app has a simple and easy-to-use interface
+All data is saved on the phone and works without internet
+The user can choose to view tasks by priority or due date
+Criterion B: Design Overview
+This part of the project shows how I planned the structure and design of the task management
+app based on my client Mr. M’s needs. I used his suggestions and feedback to decide how the
+app should work, look, and store data.
+Database Dictionary
+Users Details
+This table stores basic account details for each user of the app. It includes their name, email,
+password, birthday, phone number, and optional profile picture. Each user is given a unique
+user
+_
+id so the app can keep their tasks separate.
+Field Name Data type Validation Description
+user
+_
+id Integer Must be unique;
+auto-increment
+A unique ID number
+for each user
+name String Cannot be empty Full name of the user
+email String Must include ‘@’;
+must be unique
+Used for login and
+communication
+password String Must be at least 8
+characters
+Password chosen by
+the user
+birthday String Must be a valid date
+(YYYY-MM-DD)
+User’s date of birth
+phone
+_
+number String Cannot be empty Contact number of
+the user
+profile
+_picture Binary Must be .jpg or .png
+format
+Optional picture
+shown in the profile
+Task
+This table keeps track of all the tasks that users create. Each task is linked to a user and
+includes important details like the title, deadline, priority level, estimated duration, and
+completion status. The app uses this information to sort tasks and show reminders.
+Field Name Data Type Validation Description
+task
+_
+id Integer Primary key,
+auto-increment
+Unique ID for each
+task
+user
+_
+id Integer Must match an
+existing user
+_
+id
+Connects task to the
+correct user
+title String Cannot be empty Short name or label
+for the task
+description String Optional More detailed info
+about the task
+due
+_
+date String Must follow
+"YYYY-MM-DD
+HH:MM" format
+The deadline for the
+task
+important
+_
+level String Must be "High"
+,
+"Medium"
+, or
+"Low"
+Priority selected by
+the user
+estimated
+_
+duration String Must be 0 or more Time (in hours) user
+thinks task will take
+(optional)
+reminder
+_
+enable Integer 0 (off) or 1 (on) Whether a reminder
+should be sent
+completed Integer 0 (not done) or 1
+(done)
+Marks if the task has
+been finished
+created
+_
+at String Auto-set to current
+date and time
+When the task was
+added
+updated
+_
+at String Auto-set when task is
+edited
+Last time any part of
+the task was changed
+Reminders
+This table handles all the scheduled reminders for tasks. Each reminder is linked to a task and
+includes the time it should be sent and whether it has already been delivered. This helps the
+app know when to notify users so they don’t miss deadlines.
+Field Name Data Type Validation Description
+reminder
+_
+id Integer Primary key,
+auto-increment
+Unique ID for each
+reminder
+task
+_
+id Integer Must match an Links this reminder to
+remind
+_
+time sent created
+_
+at String Integer String existing task
+_
+id Must follow
+"YYYY-MM-DD
+HH:MM" format
+0 (not sent) or 1
+(sent)
+Auto-set to current
+date and time
+a specific task
+The exact time when
+the reminder should
+be sent
+Tracks if the reminder
+has already been
+delivered
+When the reminder
+was created
+Flowchart
+Flowchart for how to add a new task
+Flowchart on how to sign up and log in the app
+General Interface Design
+Log in and Sign in page
+Home page
+Add new task page
+Test Plan
+Success
+Criteria
+Actions 1 Open app → Tap "Add Task"
+Enter name, deadline, and
+priority → Tap "Save"
+.
+→
+2 Add 3 tasks with different
+deadlines/priorities → Check the
+main screen.
+3 Add tasks with "High,
+"
+"Medium,
+" and "Low" priority.
+4 Add a task with a reminder for 2
+minutes later → Wait.
+5 Tap the checkbox next to a task. 6 Ask the client (Mr. M) to navigate
+the app without instructions.
+7 Turn off Wi-Fi/data → Add/edit
+tasks → Reopen app.
+8 Tap "Sort by Due Date"
+"Sort by Priority.
+"
+→ Tap
+Expected Results
+Task appears in the correct priority
+list (High/Medium/Low).
+Tasks are sorted: High (top) →
+Medium → Low (bottom).
+Tasks are grouped under labeled
+sections
+Notification pops up at the set time
+Task gets a strikethrough or moves to
+a "Completed" section.
+Client can add/sort tasks within 1
+minute.
+All changes are saved and visible.
+Tasks reorder correctly (by date first,
+then by priority).
+Record of Tasks
+Task
+Numb
+er
+Planned action 1 Client meeting
+(Mr. M)
+2 Supervisor
+consultation
+3 Detailed client
+discussion
+4 Research tools/
+libraries
+5 Document
+success criteria
+6 Design overview
+of the whole
+program/app
+7 Design the
+interface of the
+app
+8 Create and
+design
+flowcharts to
+understand how
+the function run
+9 Create a test
+plan based on
+the success
+criteria
+Planned
+outcome
+Meet with my
+client and plan
+general outline
+and idea
+Approve app
+idea
+Finalize 8
+success criteria
+(e.g., sorting,
+reminders,
+offline use).
+Select Python,
+Kivy, KivyMD,
+SQLite, and
+datetime for
+development.
+List all 8 criteria
+with measurable
+outcomes
+Complete the
+design for the
+program/app,to
+identify how the
+system works
+Complete the
+interface design
+for the app
+Complete at
+least 2 flowchart
+diagram
+Complete their
+test plan, base
+on the success
+criteria
+Time
+estimated
+Target
+completion
+date
+Criterion
+50 min April
+14,2025
+A
+15 min April
+16,2025
+A
+3 days April
+17,2025
+A
+4 days April
+21,2025
+A
+1 day April
+25,2025
+A
+2 days April
+26,2025
+B
+1 day April
+28,2025
+B
+1 day April
+29,2025
+B
+3 hours April
+30,2025
+B
+10 11 12 13 14 15 16 17 18 19 20 Finalized and
+compile Criteria
+B
+Set up the
+database
+Code the task
+input screen
+Add sorting
+logic
+Make the task
+list screen
+Add reminders Connect buttons
+(Mark as Done,
+Delete)
+Check and fix
+bugs in the
+program
+Finalizing and
+complete the
+program
+Record screen
+demo
+Film client (Mr.
+M) testing the
+Recheck and
+finalized the
+Criterion B
+Create tables to
+store user tasks
+and reminders.
+Users can type
+task names,
+deadlines, and
+pick priority
+(High/Medium/
+Low).
+Tasks
+automatically
+sort by deadline
+and importance
+Show tasks in 3
+sections: High,
+Medium, Low
+priority.
+Users get
+notifications
+when tasks are
+almost due.
+Users can
+check off tasks
+or remove them.
+For example: If
+reminders don’t
+work, find and
+fix the code
+Complete and
+revise the
+Criterion C
+Show: adding
+tasks, sorting,
+reminders, and
+marking tasks
+as done.
+Client explains
+how it helps him
+2 hours April
+30,2025
+B
+5 days July 10,2025 C
+5 days July 16,2025 C
+2 days July 22,2025 C
+2 days July 24,2025 C
+3 days July 26,2025 C
+2 days July 30,2025 C
+2 days August
+3,2025
+C
+5 days August
+6,2025
+C
+1 day August
+8,2025
+D
+1 hour August
+9,2025
+D
+21 22 23 24 25 26 app Edit video (MP4) Submit the
+video and wait
+for supervisor
+approval
+Client feedback
+survey
+Compare app to
+success criteria
+Plan
+improvements
+Gather all
+informations
+prioritize
+homework.
+Combine clips +
+add captions
+Revise the
+video
+Ask Mr. M:
+"Does the app
+reduce stress?
+“Does it help?
+Check if it meet
+the successful
+criteria from
+Criterion A
+List the things
+which my app
+can be
+improved
+Complete the
+Criterion E
+evaluation
+1 day 3 days 1 day 2 days 3 days 10 days August
+11,2025
+August
+20,2025
+August
+22,2025
+September
+1,2025
+September
+4,2025
+September
+10,2025
+D
+D
+E
+E
+E
+E
