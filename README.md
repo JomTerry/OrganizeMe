@@ -1,4 +1,4 @@
-# OrganizeMe - Task Management App for IBDP Students
+# OrganizeMe - Task Management App
 
 A lightweight Android app that helps IBDP students manage tasks with automatic priority sorting and deadline reminders.
 
