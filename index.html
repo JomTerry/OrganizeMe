@@ -4,4 +4,14 @@
 <h1>Hello World</h1>
 <p>I'm hosted with GitHub Pages.</p>
 </body>
-</index.html>
+</html>
+
+git add .
+git commit -m "Publish website to GitHub Pages"
+git push origin main
+
+git checkout --orphan gh-pages
+git reset --hard
+git add .
+git commit -m "Deploy to GitHub Pages"
+git push origin gh-pages --force
