@@ -1,4 +1,4 @@
-Criterion A: Planning
+### Criterion A: Planning
 Statement of the Problem
 My client, Mr. Mivan, is an IBDP student. Like many students in the IB program, he often has a
 lot of work to do at the same time. He needs to finish school assignments, study for tests, and
