@@ -1,0 +1,57 @@
+name: Build Android APK (Buildozer)
+
+on:
+  workflow_dispatch:   # allows you to run it manually from GitHub UI
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360   # allow up to 6 hours (first builds can be long)
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install apt packages
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip openjdk-11-jdk build-essential autoconf automake \
+            libtool pkg-config zlib1g-dev python3-pip python3-venv \
+            libssl-dev libsqlite3-dev libffi-dev
+
+      - name: Setup Python and pip
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+
+      - name: Install Buildozer and Cython
+        run: |
+          python3 -m pip install --upgrade buildozer==1.4.6
+          python3 -m pip install --upgrade cython
+
+      - name: Show buildozer.spec (for debug)
+        run: |
+          if [ -f buildozer.spec ]; then echo "buildozer.spec present"; else echo "No buildozer.spec found"; fi
+          echo "Listing repo files:"
+          ls -la
+
+      - name: Build APK (debug)
+        env:
+          BUILDERVERBOSE: "1"
+        run: |
+          # If buildozer.spec doesn't exist, this will fail.
+          buildozer -v android debug
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: organizeMe-apk
+          path: |
+            bin/*.apk
+            bin/*.aab
+            bin/*-debug.apk
