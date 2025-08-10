@@ -1,15 +1,15 @@
 name: Build Android APK (Buildozer)
 
 on:
-  workflow_dispatch:   # allows you to run it manually from GitHub UI
+  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # allow up to 6 hours (first builds can be long)
+    timeout-minutes: 360
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -24,26 +24,27 @@ jobs:
             libtool pkg-config zlib1g-dev python3-pip python3-venv \
             libssl-dev libsqlite3-dev libffi-dev
 
-      - name: Setup Python and pip
+      - name: Setup Python & pip
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
 
-      - name: Install Buildozer and Cython
+      - name: Install Buildozer & Cython
         run: |
           python3 -m pip install --upgrade buildozer==1.4.6
           python3 -m pip install --upgrade cython
 
-      - name: Show buildozer.spec (for debug)
+      - name: Show files (debug)
         run: |
-          if [ -f buildozer.spec ]; then echo "buildozer.spec present"; else echo "No buildozer.spec found"; fi
-          echo "Listing repo files:"
+          echo "Listing repo root..."
           ls -la
+          echo "Listing OrganizeMe/..."
+          ls -la OrganizeMe || true
 
       - name: Build APK (debug)
         env:
           BUILDERVERBOSE: "1"
         run: |
-          # If buildozer.spec doesn't exist, this will fail.
+          # If your buildozer.spec is at repo root and points to source.dir = OrganizeMe, run here.
           buildozer -v android debug
 
       - name: Upload APK artifact
