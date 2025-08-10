@@ -1,37 +1,34 @@
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.uix.widget import Widget
 from kivy.utils import platform
 
-# Only load WebView on Android
-if platform == 'android':
-    from android.runnable import run_on_ui_thread
-    from jnius import autoclass, cast
+if platform == "android":
+    from jnius import autoclass
 
 class WebViewApp(App):
     def build(self):
-        if platform == 'android':
-            self.load_webview()
-            return Widget()  # Empty placeholder
+        if platform == "android":
+            # Android classes
+            WebView = autoclass('android.webkit.WebView')
+            WebViewClient = autoclass('android.webkit.WebViewClient')
+            activity = autoclass('org.kivy.android.PythonActivity').mActivity
+
+            # Create WebView
+            webview = WebView(activity)
+            webview.getSettings().setJavaScriptEnabled(True)
+            webview.setWebViewClient(WebViewClient())
+
+            # Load local HTML file from assets
+            webview.loadUrl("file:///android_asset/index.html")
+
+            activity.setContentView(webview)
+            return Label(text="")  # Kivy needs to return a widget
         else:
-            return Label(text="This app is designed for Android only.")
-
-    @run_on_ui_thread
-    def load_webview(self):
-        PythonActivity = autoclass('org.kivy.android.PythonActivity')
-        WebView = autoclass('android.webkit.WebView')
-        WebViewClient = autoclass('android.webkit.WebViewClient')
-
-        activity = PythonActivity.mActivity
-        webview = WebView(activity)
-        webview.getSettings().setJavaScriptEnabled(True)
-        webview.setWebViewClient(WebViewClient())
-
-        # Load local file from assets
-        webview.loadUrl("file:///android_asset/index.html")
-
-        activity.setContentView(webview)
+            # Non-Android fallback
+            return BoxLayout(orientation='vertical', children=[
+                Label(text="WebView works only on Android build.\nOpen index.html in your browser.")
+            ])
 
 if __name__ == '__main__':
     WebViewApp().run()
