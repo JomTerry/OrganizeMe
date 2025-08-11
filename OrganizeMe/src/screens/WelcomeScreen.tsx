@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Image,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
+import AuthModal from '../components/AuthModal';
 
 type WelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Welcome'>;
 
@@ -16,7 +16,13 @@ interface Props {
   navigation: WelcomeScreenNavigationProp;
 }
 
-const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
+const WelcomeScreen: React.FC<Props> = () => {
+  const [authVisible, setAuthVisible] = useState(false);
+  const [initialTab, setInitialTab] = useState<'signin' | 'signup'>('signin');
+
+  const openSignin = () => { setInitialTab('signin'); setAuthVisible(true); };
+  const openSignup = () => { setInitialTab('signup'); setAuthVisible(true); };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -27,19 +33,21 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.signUpButton]}
-            onPress={() => navigation.navigate('SignUp')}>
+          <TouchableOpacity style={[styles.button, styles.signUpButton]} onPress={openSignup}>
             <Text style={styles.signUpButtonText}>Sign Up</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, styles.loginButton]}
-            onPress={() => navigation.navigate('Login')}>
+          <TouchableOpacity style={[styles.button, styles.loginButton]} onPress={openSignin}>
             <Text style={styles.loginButtonText}>Log In</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      <AuthModal
+        visible={authVisible}
+        onClose={() => setAuthVisible(false)}
+        initialTab={initialTab}
+      />
     </SafeAreaView>
   );
 };
