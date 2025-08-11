@@ -1,91 +1,208 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>OrganizeMe Runner</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OrganizeMe</title>
+
+<!-- Try to load external stylesheet if present -->
+<link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
+<style id="fallback-style">
+  :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  body{background:var(--bg);-webkit-font-smoothing:antialiased}
+  header{background:linear-gradient(90deg,var(--accent),#2a9df4);color:#fff;padding:14px 16px}
+  .wrap{max-width:980px;margin:18px auto;padding:0 16px}
+  .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(16,24,40,.06)}
+  .row{display:flex;gap:8px;align-items:center}
+  input,select,textarea,button{font:inherit}
+  input,select,textarea{padding:8px;border-radius:8px;border:1px solid #e6e9ee}
+  button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid #e6e9ee}
+  ul.task-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+  li.task{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px;border-radius:8px;background:#fafafa}
+  .meta{font-size:13px;color:var(--muted)}
+  .badge{padding:4px 8px;border-radius:999px;font-weight:600;font-size:12px}
+  .high{background:#ffe9e9;color:#9b1c1c}
+  .med{background:#fff7e6;color:#8a5700}
+  .low{background:#e9f7ff;color:#03506f}
+  .empty{text-align:center;color:var(--muted);padding:18px}
+  @media(min-width:720px){.form-grid{display:flex;gap:10px;align-items:flex-end}}
+</style>
 </head>
 <body>
-  <h1>OrganizeMe Runner</h1>
-  <div id="output">Loading OrganizeMe…</div>
+<header>
+  <div class="wrap">
+    <h1 style="margin:.1rem 0">OrganizeMe</h1>
+    <div style="opacity:.95">Task manager — web fallback included</div>
+  </div>
+</header>
 
-  <script>
-    // ─── CONFIGURATION ───────────────────────────────
-    const OWNER  = 'JomTerry';
-    const REPO   = 'OrganizeMe';
-    const BRANCH = 'main';
-    const FOLDER = 'OrganizeMe';
-    // ─────────────────────────────────────────────────
+<main class="wrap" style="margin-top:14px">
+  <section class="card" id="creator">
+    <form id="task-form" onsubmit="return false;">
+      <div class="form-grid">
+        <div style="flex:1">
+          <label>Task</label><br>
+          <input id="title" placeholder="e.g. Finish report" required />
+        </div>
+        <div style="width:140px">
+          <label>Due</label><br>
+          <input id="due" type="date" />
+        </div>
+        <div style="width:120px">
+          <label>Priority</label><br>
+          <select id="importance">
+            <option>High</option><option selected>Medium</option><option>Low</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="add-btn" onclick="addTask()">Add</button>
+          <button id="clear-all" class="ghost" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+    </form>
+  </section>
 
-    const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
-    const output = document.getElementById('output');
+  <section class="card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <label>View:</label>
+      <select id="view-mode" onchange="render()">
+        <option value="priority">Priority then due</option>
+        <option value="date">Earliest due</option>
+      </select>
+      <label style="margin-left:auto"><input id="show-complete" type="checkbox" onchange="render()"> Show completed</label>
+    </div>
 
-    fetch(apiUrl)
-      .then(res => {
-        if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        // grab only the blobs inside your folder
-        const files = data.tree.filter(item =>
-          item.type === 'blob' && item.path.startsWith(`${FOLDER}/`)
-        );
+    <div id="list-wrap"><div class="empty">Loading…</div></div>
+  </section>
+</main>
 
-        if (files.length === 0) {
-          output.textContent = `⚠️ No files found in ${FOLDER}/`;
-          return;
-        }
+<script>
+/*
+  Behavior:
+  - Try to load external index.js by adding <script src="index.js">.
+  - If it fails to load (404), fallback to built-in app implementation below.
+*/
+(function bootstrap(){
+  // Try to load external JS; if fails, run fallback
+  var s = document.createElement('script');
+  s.src = 'index.js';
+  s.onload = function(){ console.log('External index.js loaded. Using external script.'); };
+  s.onerror = function(){
+    console.warn('No external index.js found — running fallback UI logic.');
+    runFallbackApp();
+  };
+  document.body.appendChild(s);
 
-        // clear the “Loading…” text
-        output.textContent = '';
+  // If style.css failed to load, the fallback style element stays applied (already in HTML).
+  var extStyle = document.getElementById('ext-style');
+  extStyle.onerror = function(){ window.__styleLoaded=false; /* fallback style already present */ };
+})();
 
-        files.forEach(item => {
-          const path = item.path;            // e.g. "OrganizeMe/app.js"
-          const ext  = path.slice(path.lastIndexOf('.')).toLowerCase();
+/* ============================
+   Fallback in-browser app
+   ============================ */
+function runFallbackApp(){
+  // keep everything scoped; don't overwrite if an external app already defines functions
+  if (window.__organizeMeFallbackRan) return;
+  window.__organizeMeFallbackRan = true;
 
-          switch (ext) {
-            case '.js':
-              // inject & run JS
-              const script = document.createElement('script');
-              script.src = path;
-              document.body.appendChild(script);
-              break;
+  const STORAGE_KEY = 'organizeMe.tasks.v1';
+  let tasks = [];
+  const title = document.getElementById('title');
+  const due = document.getElementById('due');
+  const importance = document.getElementById('importance');
+  const listWrap = document.getElementById('list-wrap');
+  const viewMode = document.getElementById('view-mode');
+  const showComplete = document.getElementById('show-complete');
 
-            case '.css':
-              // inject stylesheet
-              const link = document.createElement('link');
-              link.rel  = 'stylesheet';
-              link.href = path;
-              document.head.appendChild(link);
-              break;
+  function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+  function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||0); }
+  function isDueSoon(d){
+    if(!d) return false;
+    const diff = new Date(d+'T23:59:59').getTime() - Date.now();
+    return diff>0 && diff <= (1000*60*60*24*2);
+  }
 
-            case '.html':
-              // render HTML in an iframe
-              const wrapper = document.createElement('div');
-              wrapper.style.margin = '1em 0';
-              const title = document.createElement('h2');
-              title.textContent = path.split('/').pop();
-              const iframe = document.createElement('iframe');
-              iframe.src    = path;
-              iframe.width  = '100%';
-              iframe.height = '400';
-              iframe.style.border = '1px solid #ccc';
-              wrapper.appendChild(title);
-              wrapper.appendChild(iframe);
-              output.appendChild(wrapper);
-              break;
+  function render(){
+    const visible = tasks.filter(t => showComplete.checked ? true : !t.done);
+    if (!visible.length){ listWrap.innerHTML='<div class="empty">No tasks yet — add one above.</div>'; return; }
+    if (viewMode.value === 'date'){
+      visible.sort((a,b) => { if(!a.due && !b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+    } else {
+      visible.sort((a,b)=>{ const imp=importanceRank(b.importance)-importanceRank(a.importance); if(imp) return imp; if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+    }
 
-            default:
-              // for any other files, just link to them
-              const p = document.createElement('p');
-              p.innerHTML = `<a href="${path}" target="_blank">${path.split('/').pop()}</a>`;
-              output.appendChild(p);
-          }
-        });
-      })
-      .catch(err => {
-        output.textContent = '❌ Failed to load OrganizeMe folder.';
-        console.error(err);
-      });
-  </script>
+    const ul = document.createElement('ul'); ul.className='task-list';
+    visible.forEach(t=>{
+      const li = document.createElement('li'); li.className='task';
+      if (t.done) li.classList.add('completed');
+
+      const left = document.createElement('div'); left.style.display='flex'; left.style.gap='10px'; left.style.alignItems='center';
+      const badge = document.createElement('div'); badge.className='badge ' + (t.importance==='High'?'high':t.importance==='Medium'?'med':'low'); badge.textContent = t.importance;
+      const info = document.createElement('div');
+      const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>'+escapeHtml(t.title)+'</strong>';
+      const meta = document.createElement('div'); meta.className='meta';
+      const dueText = t.due ? 'Due '+t.due : 'No due date';
+      const soon = isDueSoon(t.due) && !t.done ? ' • <span style="color:#b91c1c;font-weight:600">due soon</span>' : '';
+      meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
+      info.appendChild(titleEl); info.appendChild(meta);
+      left.appendChild(badge); left.appendChild(info);
+
+      const ctr = document.createElement('div'); ctr.style.display='flex'; ctr.style.gap='8px';
+      const doneBtn = document.createElement('button'); doneBtn.textContent = t.done ? 'Undo' : 'Done';
+      doneBtn.onclick = ()=>{ t.done = !t.done; save(); render(); };
+      const editBtn = document.createElement('button'); editBtn.className='ghost'; editBtn.textContent='Edit';
+      editBtn.onclick = ()=>{ openEdit(t); };
+      const delBtn = document.createElement('button'); delBtn.className='ghost'; delBtn.textContent='Delete';
+      delBtn.onclick = ()=>{ if(confirm('Delete this task?')){ tasks = tasks.filter(x=>x.id!==t.id); save(); render(); } };
+      ctr.appendChild(doneBtn); ctr.appendChild(editBtn); ctr.appendChild(delBtn);
+
+      li.appendChild(left); li.appendChild(ctr);
+      ul.appendChild(li);
+    });
+    listWrap.innerHTML=''; listWrap.appendChild(ul);
+  }
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  function addTask(){
+    const t = { id: uid(), title: title.value.trim(), notes: '', due: due.value || null, importance: importance.value, done:false, createdAt:new Date().toISOString() };
+    if (!t.title) return alert('Give the task a name.');
+    tasks.push(t); save(); render(); title.value=''; due.value=''; importance.value='Medium';
+  }
+
+  function openEdit(task){
+    const newTitle = prompt('Edit title', task.title);
+    if (newTitle === null) return;
+    task.title = newTitle.trim() || task.title;
+    const newNotes = prompt('Edit notes', task.notes||'');
+    if (newNotes !== null) task.notes = newNotes.trim();
+    const newDue = prompt('Due (YYYY-MM-DD) or blank', task.due||'');
+    if (newDue !== null) task.due = newDue.trim() || null;
+    const newImp = prompt('Importance: High / Medium / Low', task.importance) || task.importance;
+    if (['High','Medium','Low'].includes(newImp)) task.importance = newImp;
+    save(); render();
+  }
+
+  function clearAll(){ if(!confirm('Clear all tasks?')) return; tasks=[]; save(); render(); }
+
+  // UI hookup
+  window.addEventListener('DOMContentLoaded', ()=>{ /* no-op: already DOM loaded */});
+  document.getElementById('add-btn').addEventListener('click', addTask);
+  document.getElementById('clear-all').addEventListener('click', ()=>{ clearAll(); });
+
+  viewMode.addEventListener('change', render);
+  showComplete.addEventListener('change', render);
+
+  load(); render();
+
+  // expose for debug
+  window.OrganizeMe = { load, save, tasks, render };
+}
+</script>
 </body>
 </html>
