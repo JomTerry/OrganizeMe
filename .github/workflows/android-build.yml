@@ -46,7 +46,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install --upgrade cython==0.29.33
-          python3 -m pip install --upgrade buildozer==1.5.0
+          python3 -m pip install --upgrade buildozer
 
       - name: Show repo (debug)
         run: |
