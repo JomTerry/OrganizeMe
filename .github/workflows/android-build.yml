@@ -115,9 +115,15 @@ jobs:
             bin/*.aab
             bin/*-debug.apk
 
+- name: Check Buildozer version
+  run: |
+    buildozer --version || echo "Buildozer command not found"
+    pip show buildozer
+
 - name: Force uninstall old buildozer
   run: |
     pip uninstall -y buildozer || true
+
 			- name: Install Buildozer 1.5.0
 			  run: |
    			 pip uninstall -y buildozer
