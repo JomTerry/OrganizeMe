@@ -43,6 +43,7 @@
   .password-field{position:relative;display:flex;align-items:center}
   .password-field input{flex:1;padding-right:64px}
   .password-field .toggle{position:absolute;right:6px;background:transparent;border:0;color:#374151;cursor:pointer;padding:4px 8px}
+.oauth-btn img{width:18px;height:18px}
 </style>
   <script>
     window.FIREBASE_CONFIG = {
@@ -93,6 +94,11 @@
         <div class="tab-row">
           <button id="tab-signin" class="tab active" type="button">Sign in</button>
           <button id="tab-signup" class="tab" type="button">Sign up</button>
+        </div>
+
+        <div class="oauth" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;align-items:stretch">
+          <button id="google-btn" type="button" class="oauth-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:#374151;border:1px solid #e5e7eb">Continue with Google</button>
+          <div class="meta" style="text-align:center">or</div>
         </div>
 
         <form id="signin-form" onsubmit="return false;" class="col" style="gap:10px">
@@ -178,7 +184,7 @@
     f.type = 'module';
     f.innerHTML = `
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
       const cfg = {
         apiKey: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) || 'YOUR_API_KEY',
         authDomain: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.authDomain) || 'YOUR_AUTH_DOMAIN',
@@ -189,6 +195,7 @@
       };
       const app = initializeApp(cfg);
       const auth = getAuth(app);
+      const googleProvider = new GoogleAuthProvider();
       const $ = (id) => document.getElementById(id);
       function showSignedIn(email){
         $('signed-in-row').style.display='flex';
@@ -223,6 +230,10 @@
         if(p1!==p2) return alert('Passwords do not match');
         try { await createUserWithEmailAndPassword(auth, email, p1); }
         catch(e){ alert(e.message || 'Sign-up failed'); }
+      };
+      $('google-btn').onclick = async ()=>{
+        try { await signInWithPopup(auth, googleProvider); }
+        catch(e){ alert(e.message || 'Google sign-in failed'); }
       };
       $('signout-btn').onclick = async ()=>{ try{ await signOut(auth); }catch(e){ alert(e.message || 'Sign-out failed'); } };
       $('open-auth').onclick = ()=> openModal();
@@ -291,7 +302,7 @@ function runFallbackApp(){
       const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>'+escapeHtml(t.title)+'</strong>';
       const meta = document.createElement('div'); meta.className='meta';
       const dueText = t.due ? 'Due '+t.due : 'No due date';
-      const soon = isDueSoon(t.due) && !t.done ? ' • <span style="color:#b91c1c;font-weight:600">due soon</span>' : '';
+      const soon = isDueSoon(t.due) && !t.done ? ' • <span style='color:#b91c1c;font-weight:600'>due soon</span>' : '';
       meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
       info.appendChild(titleEl); info.appendChild(meta);
       left.appendChild(badge); left.appendChild(info);
@@ -311,7 +322,7 @@ function runFallbackApp(){
     listWrap.innerHTML=''; listWrap.appendChild(ul);
   }
 
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function escapeHtml(s){ return String(s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#39;' }[c])); }
 
   function addTask(){
     const t = { id: uid(), title: title.value.trim(), notes: '', due: due.value || null, importance: importance.value, done:false, createdAt:new Date().toISOString() };
