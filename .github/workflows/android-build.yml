@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
@@ -33,6 +33,9 @@ jobs:
     key: ${{ runner.os }}-build-${{ hashFiles('requirements.txt', 'buildozer.spec') }}-${{ github.run_number }}
     restore-keys: |
       ${{ runner.os }}-build-
+
+    - name: Install Buildozer
+      run: pip install buildozer==1.5.0
 
       - name: Install system dependencies
         run: |
