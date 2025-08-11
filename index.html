@@ -35,10 +35,40 @@
   <div class="wrap">
     <h1 style="margin:.1rem 0">OrganizeMe</h1>
     <div style="opacity:.95">Task manager — web fallback included</div>
-  </div>
-</header>
+    </div>
+  </header>
+  
+  <section class="wrap" id="auth" style="margin-top:14px">
+    <div class="card" style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between">
+      <div id="auth-status" style="flex:1">
+        <div class="row" id="signed-out-row">
+          <strong>Welcome!</strong>
+          <span class="meta">Sign in to sync across devices.</span>
+        </div>
+        <div class="row" id="signed-in-row" style="display:none">
+          <span>Signed in as <strong id="auth-email"></strong></span>
+          <button id="signout-btn" class="ghost" style="margin-left:auto">Sign out</button>
+        </div>
+      </div>
+      <div id="auth-forms" class="row" style="gap:12px">
+        <form id="signin-form" onsubmit="return false;" class="row" style="gap:8px">
+          <input id="signin-email" type="email" placeholder="Email" required />
+          <input id="signin-password" type="password" placeholder="Password" required />
+          <button id="signin-btn">Sign in</button>
+          <button id="to-signup" class="ghost" title="Create an account">Sign up</button>
+        </form>
+        <form id="signup-form" onsubmit="return false;" class="row" style="gap:8px; display:none">
+          <input id="signup-email" type="email" placeholder="Email" required />
+          <input id="signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
+          <input id="signup-confirm" type="password" placeholder="Confirm" minlength="6" required />
+          <button id="signup-btn">Create account</button>
+          <button id="to-signin" class="ghost" title="Have an account?">Sign in</button>
+        </form>
+      </div>
+    </div>
+  </section>
 
-<main class="wrap" style="margin-top:14px">
+  <main class="wrap" style="margin-top:14px">
   <section class="card" id="creator">
     <form id="task-form" onsubmit="return false;">
       <div class="form-grid">
@@ -91,6 +121,54 @@
   s.onload = function(){ console.log('External index.js loaded. Using external script.'); };
   s.onerror = function(){
     console.warn('No external index.js found — running fallback UI logic.');
+    // Load Firebase Web SDK for web fallback auth
+    var f = document.createElement('script');
+    f.type = 'module';
+    f.innerHTML = `
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      const cfg = {
+        apiKey: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) || 'YOUR_API_KEY',
+        authDomain: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.authDomain) || 'YOUR_AUTH_DOMAIN',
+        projectId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) || 'YOUR_PROJECT_ID',
+        storageBucket: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.storageBucket) || 'YOUR_STORAGE_BUCKET',
+        messagingSenderId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.messagingSenderId) || 'YOUR_MESSAGING_SENDER_ID',
+        appId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.appId) || 'YOUR_APP_ID',
+      };
+      const app = initializeApp(cfg);
+      const auth = getAuth(app);
+      const $ = (id) => document.getElementById(id);
+      function showSignedIn(email){
+        $('signed-in-row').style.display='flex';
+        $('signed-out-row').style.display='none';
+        $('auth-email').textContent = email || '';
+        $('signin-form').style.display='none';
+        $('signup-form').style.display='none';
+      }
+      function showSignedOut(){
+        $('signed-in-row').style.display='none';
+        $('signed-out-row').style.display='flex';
+        $('signin-form').style.display='flex';
+        $('signup-form').style.display='none';
+      }
+      onAuthStateChanged(auth, (u)=>{ if(u) showSignedIn(u.email); else showSignedOut(); });
+      $('signin-btn').onclick = async ()=>{
+        try { await signInWithEmailAndPassword(auth, $('signin-email').value.trim(), $('signin-password').value); }
+        catch(e){ alert(e.message || 'Sign-in failed'); }
+      };
+      $('signup-btn').onclick = async ()=>{
+        const email = $('signup-email').value.trim();
+        const p1 = $('signup-password').value;
+        const p2 = $('signup-confirm').value;
+        if(p1!==p2) return alert('Passwords do not match');
+        try { await createUserWithEmailAndPassword(auth, email, p1); }
+        catch(e){ alert(e.message || 'Sign-up failed'); }
+      };
+      $('signout-btn').onclick = async ()=>{ try{ await signOut(auth); }catch(e){ alert(e.message || 'Sign-out failed'); } };
+      $('to-signup').onclick = ()=>{ $('signin-form').style.display='none'; $('signup-form').style.display='flex'; };
+      $('to-signin').onclick = ()=>{ $('signup-form').style.display='none'; $('signin-form').style.display='flex'; };
+    `;
+    document.body.appendChild(f);
     runFallbackApp();
   };
   document.body.appendChild(s);

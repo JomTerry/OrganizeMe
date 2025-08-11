@@ -1,42 +1,70 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DatabaseService from './database';
 import { User } from '../types';
+import { auth } from './firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 const CURRENT_USER_KEY = 'current_user';
+const FIREBASE_PASSWORD_SENTINEL = 'firebase_auth';
 
 class AuthService {
   async login(email: string, password: string): Promise<User | null> {
     try {
-      const user = await DatabaseService.getUserByEmail(email);
-      
-      if (user && user.password === password) {
-        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-        return user;
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const fbUser = credential.user;
+
+      // Find existing local user or create a minimal one if missing
+      let localUser = await DatabaseService.getUserByEmail(email);
+      if (!localUser) {
+        const defaultName = fbUser.displayName || email.split('@')[0];
+        const defaultBirthday = '1970-01-01';
+        const defaultPhone = fbUser.phoneNumber || '';
+        const userId = await DatabaseService.createUser({
+          name: defaultName,
+          email,
+          password: FIREBASE_PASSWORD_SENTINEL,
+          birthday: defaultBirthday,
+          phone_number: defaultPhone,
+        });
+        localUser = await DatabaseService.getUserById(userId);
       }
-      
+
+      if (localUser) {
+        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(localUser));
+        return localUser;
+      }
+
       return null;
     } catch (error) {
       console.error('Login error:', error);
-      return null;
+      throw error;
     }
   }
 
   async register(userData: Omit<User, 'user_id'>): Promise<User | null> {
     try {
-      // Check if user already exists
+      // Create Firebase user
+      await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+
+      // Ensure a local profile exists for tasks linkage
       const existingUser = await DatabaseService.getUserByEmail(userData.email);
       if (existingUser) {
-        throw new Error('User with this email already exists');
+        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(existingUser));
+        return existingUser;
       }
 
-      const userId = await DatabaseService.createUser(userData);
+      const userId = await DatabaseService.createUser({
+        ...userData,
+        // Do not store real password locally; mark as Firebase-managed
+        password: FIREBASE_PASSWORD_SENTINEL,
+      });
       const newUser = await DatabaseService.getUserById(userId);
-      
+
       if (newUser) {
         await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
         return newUser;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Registration error:', error);
@@ -56,9 +84,11 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
+      await signOut(auth);
       await AsyncStorage.removeItem(CURRENT_USER_KEY);
     } catch (error) {
       console.error('Logout error:', error);
+      throw error;
     }
   }
 
@@ -75,7 +105,7 @@ class AuthService {
   }
 
   validatePhoneNumber(phoneNumber: string): boolean {
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    const phoneRegex = /^[\+]?[^\D][\d]{0,15}$/;
     return phoneRegex.test(phoneNumber.replace(/[\s\-\(\)]/g, ''));
   }
 }
