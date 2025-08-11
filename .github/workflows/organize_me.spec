@@ -39,3 +39,8 @@ android.minapi = 21
 android.ndk = 23b
 # Architectures (include 64-bit for Play Store)
 android.archs = arm64-v8a,armeabi-v7a
+
+- name: Install Buildozer 1.5.0
+  run: |
+    pip uninstall -y buildozer
+    pip install buildozer==1.5.0
