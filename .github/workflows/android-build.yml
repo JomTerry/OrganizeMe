@@ -111,3 +111,8 @@ jobs:
             bin/*.apk
             bin/*.aab
             bin/*-debug.apk
+
+			- name: Install Buildozer 1.5.0
+			  run: |
+   			 pip uninstall -y buildozer
+					pip install buildozer==1.5.0
