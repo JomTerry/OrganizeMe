@@ -39,3 +39,7 @@ android.minapi = 21
 android.ndk = 23b
 # Architectures (include 64-bit for Play Store)
 android.archs = arm64-v8a,armeabi-v7a
+
+# In your workflow (.github/workflows/build-apk.yml)
+- name: Install Buildozer
+  run: pip install buildozer==1.3.0
