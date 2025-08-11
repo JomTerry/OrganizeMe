@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, AuthContextType } from '../types';
 import AuthService from '../services/auth';
 import DatabaseService from '../services/database';
+import { auth } from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -27,17 +29,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const initializeAuth = async () => {
     try {
-      // Initialize database
+      // Initialize local database (used for tasks and user profile)
       await DatabaseService.initDatabase();
-      
-      // Check for existing user session
-      const currentUser = await AuthService.getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
-      }
+
+      // Subscribe to Firebase auth state
+      onAuthStateChanged(auth, async (fbUser) => {
+        try {
+          if (!fbUser) {
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+
+          // Map Firebase user to local user row by email
+          const email = fbUser.email || '';
+          let localUser = await DatabaseService.getUserByEmail(email);
+
+          if (!localUser) {
+            // Create a minimal local user to own tasks
+            const userId = await DatabaseService.createUser({
+              name: fbUser.displayName || email.split('@')[0] || 'User',
+              email,
+              password: 'firebase_auth',
+              birthday: '1970-01-01',
+              phone_number: fbUser.phoneNumber || '',
+            });
+            localUser = await DatabaseService.getUserById(userId);
+          }
+
+          setUser(localUser || null);
+        } catch (innerErr) {
+          console.error('Auth state mapping error:', innerErr);
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
+      });
     } catch (error) {
       console.error('Auth initialization error:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -81,7 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   if (isLoading) {
     return null; // You could return a loading screen here
-  }
+    }
 
   const value: AuthContextType = {
     user,
