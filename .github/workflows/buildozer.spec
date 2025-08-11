@@ -42,4 +42,4 @@ android.archs = arm64-v8a,armeabi-v7a
 
 # In your workflow (.github/workflows/build-apk.yml)
 - name: Install Buildozer
-  run: pip install buildozer==1.3.0
+  run: pip install buildozer==1.5.0
