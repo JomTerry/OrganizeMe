@@ -2,38 +2,112 @@ name: Build OrganizeMe APK
 
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: false
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
 
 jobs:
   build:
     runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    timeout-minutes: 360
 
-      - name: Set up cache
-        uses: actions/cache@v3
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache pip, buildozer, gradle
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pip
             ~/.buildozer
             ~/.gradle
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-build-
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
-          sudo apt update
-          sudo apt install -y python3-pip python3-setuptools python3-wheel git zip unzip openjdk-17-jdk
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.33 virtualenv
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip openjdk-17-jdk build-essential autoconf automake \
+            libtool pkg-config zlib1g-dev python3-pip python3-venv \
+            libssl-dev libsqlite3-dev libffi-dev
 
-      - name: Build APK
+      - name: Install Python build tools (pinned)
         run: |
-          buildozer android debug
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install --upgrade cython==0.29.33
+          python3 -m pip install --upgrade buildozer==1.5.0
+
+      - name: Show repo (debug)
+        run: |
+          echo "Repo root listing:"
+          ls -la
+          echo "Root files:"
+          ls -la .
+
+      - name: Prepare keystore (release only)
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ERROR: KEYSTORE_BASE64 secret is empty. Add your keystore as Base64 to Secrets." >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > organizeme.keystore
+          ls -la organizeme.keystore
+
+      - name: Build (debug or release)
+        env:
+          BUILD_TYPE: ${{ github.event.inputs.build_type }}
+        run: |
+          set -e
+          if [ "$BUILD_TYPE" = "release" ]; then
+            echo "Running release build..."
+            buildozer -v android release
+          else
+            echo "Running debug build..."
+            buildozer -v android debug
+          fi
+
+      - name: Sign & align (release only)
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # find unsigned release apk produced by buildozer
+          UNSIGNED=$(ls bin/*-release-unsigned.apk | head -n 1 || true)
+          if [ -z "$UNSIGNED" ]; then
+            echo "No unsigned release APK found in bin/ — aborting." >&2
+            ls -la bin || true
+            exit 1
+          fi
+          echo "Unsigned APK: $UNSIGNED"
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore organizeme.keystore -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" "$UNSIGNED" "$KEY_ALIAS"
+          # zipalign (should be available via SDK tools downloaded by buildozer)
+          ALIGNED="bin/OrganizeMe-release.apk"
+          zipalign -v 4 "$UNSIGNED" "$ALIGNED"
+          ls -la "$ALIGNED"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: OrganizeMe-APK
-          path: bin/*.apk
+          path: |
+            bin/*.apk
+            bin/*.aab
+            bin/*-debug.apk
