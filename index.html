@@ -302,7 +302,7 @@ function runFallbackApp(){
       const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>'+escapeHtml(t.title)+'</strong>';
       const meta = document.createElement('div'); meta.className='meta';
       const dueText = t.due ? 'Due '+t.due : 'No due date';
-      const soon = isDueSoon(t.due) && !t.done ? ' • <span style='color:#b91c1c;font-weight:600'>due soon</span>' : '';
+      const soon = isDueSoon(t.due) && !t.done ? " • <span style=\"color:#b91c1c;font-weight:600\">due soon</span>" : '';
       meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
       info.appendChild(titleEl); info.appendChild(meta);
       left.appendChild(badge); left.appendChild(info);
