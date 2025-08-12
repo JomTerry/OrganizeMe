@@ -1,5 +1,12 @@
 {
   "projects": {
     "default": "jomterryy417-c0c"
+  },
+  "targets": {
+    "jomterryy417-c0c": {
+      "hosting": {
+        "web": ["jomterryy417-c0c"]
+      }
+    }
   }
 }
