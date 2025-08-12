@@ -5,25 +5,30 @@ package.name = organizeme
 package.domain = org.jomterry
 version = 0.1
 
-# Source settings -- main.py should be at repo root (or change source.dir)
-source.dir = .
+# Source settings -- main.py will be inside OrganizeMe/
+source.dir = OrganizeMe
+# include HTML/CSS/JS so Buildozer copies them into android_asset
 source.include_exts = py,kv,html,css,js,png,jpg,jpeg,ttf,db,json
 
-# Requirements (pinned where you supplied versions)
+# Requirements (must include pyjnius for Java bridge / WebView)
 requirements = python3,kivy==2.1.0,kivymd==1.1.1,plyer==2.1.0,python-dateutil==2.8.2,pyjnius
 
 # Orientation / UI
 orientation = portrait
 fullscreen = 0
 
-# Android permissions
+# Android permissions (allow networking + optional storage if you need it)
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,VIBRATE,WAKE_LOCK
 
-# Make sure your HTML/CSS/JS are included in assets
-# Use android.add_assets to copy them into APK assets
-android.add_assets = index.html
-android.add_assets = index.js
-android.add_assets = style.css
+# Assets to bundle (paths relative to repo root)
+# Source.dir is OrganizeMe, but android.add_assets expects repo-relative paths
+android.add_assets = OrganizeMe/index.html
+android.add_assets = OrganizeMe/index.js
+android.add_assets = OrganizeMe/style.css
+
+# (Optional) app icon / presplash - uncomment and set paths if you have them
+# icon.filename = OrganizeMe/assets/icon.png
+# presplash.filename = OrganizeMe/assets/presplash.png
 
 # Build options
 log_level = 2
@@ -32,10 +37,9 @@ log_level = 2
 warn_on_root = 1
 
 [android]
-# Adjust if Play Console requires newer API; these are sensible defaults
+# Android SDK/NDK settings - sensible defaults
 android.api = 33
 android.minapi = 21
-# NDK version that works commonly; change if Buildozer/p4a complains
 android.ndk = 23b
 # Architectures (include 64-bit for Play Store)
 android.archs = arm64-v8a,armeabi-v7a
