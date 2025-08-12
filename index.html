@@ -6,8 +6,8 @@
 <title>OrganizeMe</title>
 
 <!-- Try to load external stylesheet if present -->
-<link id="ext-style" rel="stylesheet" href="style.css" />
-<style id="fallback-style" disabled>
+<link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
+<style id="fallback-style">
   :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
   body{background:var(--bg);-webkit-font-smoothing:antialiased}
@@ -184,7 +184,7 @@
   document.body.appendChild(s);
 
   // If style.css failed to load, the fallback style element stays applied (already in HTML).
-  /* External style.js handled via link; fallback style is disabled by default. */
+  // If style.css fails to load, fallback style remains applied (this is intentional).
 })();
 
 /* ============================
