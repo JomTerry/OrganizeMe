@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OrganizeMe</title>
+
+<!-- Optional external CSS (if present) -->
+<link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
+
+<!-- Fallback styles (used if style.css missing) -->
+<style id="fallback-style">
+  :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  body{background:var(--bg);-webkit-font-smoothing:antialiased}
+  header{background:linear-gradient(90deg,var(--accent),#2a9df4);color:#fff;padding:14px 16px}
+  .wrap{max-width:980px;margin:18px auto;padding:0 16px}
+  .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(16,24,40,.06)}
+  .row{display:flex;gap:8px;align-items:center}
+  input,select,textarea,button{font:inherit}
+  input,select,textarea{padding:8px;border-radius:8px;border:1px solid #e6e9ee}
+  button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid #e6e9ee}
+  ul.task-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+  li.task{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px;border-radius:8px;background:#fafafa}
+  .meta{font-size:13px;color:var(--muted)}
+  .badge{padding:4px 8px;border-radius:999px;font-weight:600;font-size:12px}
+  .high{background:#ffe9e9;color:#9b1c1c}
+  .med{background:#fff7e6;color:#8a5700}
+  .low{background:#e9f7ff;color:#03506f}
+  .empty{text-align:center;color:var(--muted);padding:18px}
+  @media(min-width:720px){.form-grid{display:flex;gap:10px;align-items:flex-end}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1 style="margin:.1rem 0">OrganizeMe</h1>
+    <div style="opacity:.95">Task manager — syncs with Firebase when signed in</div>
+  </div>
+</header>
+
+<!-- Authentication UI -->
+<section class="wrap" id="auth" style="margin-top:14px">
+  <div class="card" style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between">
+    <div id="auth-status" style="flex:1">
+      <div class="row" id="signed-out-row">
+        <strong>Welcome!</strong>
+        <span class="meta" style="margin-left:8px">Sign in to sync across devices.</span>
+      </div>
+      <div class="row" id="signed-in-row" style="display:none">
+        <span>Signed in as <strong id="auth-email"></strong></span>
+        <button id="signout-btn" class="ghost" style="margin-left:auto">Sign out</button>
+      </div>
+    </div>
+
+    <div id="auth-forms" class="row" style="gap:12px">
+      <form id="signin-form" onsubmit="return false;" class="row" style="gap:8px">
+        <input id="signin-email" type="email" placeholder="Email" required />
+        <input id="signin-password" type="password" placeholder="Password" required />
+        <button id="signin-btn">Sign in</button>
+        <button id="to-signup" class="ghost" title="Create an account">Sign up</button>
+      </form>
+
+      <form id="signup-form" onsubmit="return false;" class="row" style="gap:8px; display:none">
+        <input id="signup-email" type="email" placeholder="Email" required />
+        <input id="signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
+        <input id="signup-confirm" type="password" placeholder="Confirm" minlength="6" required />
+        <button id="signup-btn">Create account</button>
+        <button id="to-signin" class="ghost" title="Have an account?">Sign in</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- Task UI -->
+<main class="wrap" style="margin-top:14px">
+  <section class="card" id="creator">
+    <form id="task-form" onsubmit="return false;">
+      <div class="form-grid">
+        <div style="flex:1">
+          <label>Task</label><br>
+          <input id="title" placeholder="e.g. Finish report" required />
+        </div>
+        <div style="width:140px">
+          <label>Due</label><br>
+          <input id="due" type="date" />
+        </div>
+        <div style="width:120px">
+          <label>Priority</label><br>
+          <select id="importance">
+            <option>High</option><option selected>Medium</option><option>Low</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="add-btn" onclick="addTask()">Add</button>
+          <button id="clear-all" class="ghost" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <label>View:</label>
+      <select id="view-mode" onchange="render()">
+        <option value="priority">Priority then due</option>
+        <option value="date">Earliest due</option>
+      </select>
+      <label style="margin-left:auto"><input id="show-complete" type="checkbox" onchange="render()"> Show completed</label>
+    </div>
+
+    <div id="list-wrap"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+
+<script>
+/* Bootstrapping: try to load external index.js; if not present, set up Firebase module + fallback app */
+(function initBootstrap(){
+  var s = document.createElement('script');
+  s.src = 'index.js';
+  s.onload = function(){ console.log('External index.js loaded. Using external app code.'); };
+  s.onerror = function(){
+    console.warn('No external index.js found — loading Firebase fallback + offline app.');
+
+    // Create an inline ES module script that initializes Firebase and hooks into fallback app
+    var m = document.createElement('script');
+    m.type = 'module';
+    m.textContent = `
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      // Supply your Firebase config here OR define window.FIREBASE_CONFIG before this script runs.
+      const cfg = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG) || {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+      };
+
+      try {
+        const app = initializeApp(cfg);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        console.log("Firebase initialized:", cfg.projectId || "(no projectId set)");
+
+        const $ = id => document.getElementById(id);
+
+        // UI helpers
+        function showSignedIn(email){
+          $('signed-in-row').style.display='flex';
+          $('signed-out-row').style.display='none';
+          $('auth-email').textContent = email || '';
+          $('signin-form').style.display='none';
+          $('signup-form').style.display='none';
+        }
+        function showSignedOut(){
+          $('signed-in-row').style.display='none';
+          $('signed-out-row').style.display='flex';
+          $('signin-form').style.display='flex';
+          $('signup-form').style.display='none';
+          $('auth-email').textContent = '';
+        }
+
+        // Sync helpers (interact with fallback app via window.OrganizeMe)
+        async function pushLocalToRemote(uid){
+          try {
+            if (!window.OrganizeMe) return;
+            const tasks = window.OrganizeMe.getTasks();
+            const ref = doc(db, 'users', uid);
+            await setDoc(ref, { tasks: tasks || [] }, { merge: true });
+            console.log('Uploaded local tasks to Firestore for', uid);
+          } catch (e) { console.warn('pushLocalToRemote failed', e); }
+        }
+
+        async function pullRemoteToLocal(uid){
+          try {
+            const ref = doc(db, 'users', uid);
+            const snap = await getDoc(ref);
+            if (snap.exists()){
+              const data = snap.data() || {};
+              const remoteTasks = data.tasks || [];
+              if (window.OrganizeMe && Array.isArray(remoteTasks)) {
+                window.OrganizeMe.replaceTasks(remoteTasks);
+                console.log('Pulled remote tasks into local for', uid);
+              }
+            } else {
+              // If no remote doc, push local tasks as initial data
+              await pushLocalToRemote(uid);
+            }
+          } catch (e) { console.warn('pullRemoteToLocal failed', e); }
+        }
+
+        // Listen for auth changes
+        onAuthStateChanged(auth, async user => {
+          if (user) {
+            showSignedIn(user.email);
+            // pull remote tasks for this user and then subscribe to local changes
+            await pullRemoteToLocal(user.uid);
+            // Listen for local task changes and push to Firestore (debounced)
+            let syncTimeout = null;
+            const syncHandler = () => {
+              if (syncTimeout) clearTimeout(syncTimeout);
+              syncTimeout = setTimeout(()=>{ pushLocalToRemote(user.uid); }, 800);
+            };
+            window.addEventListener('OrganizeMeTasksChanged', syncHandler);
+            // store for cleanup on sign-out
+            window._organizeMeSyncHandler = syncHandler;
+          } else {
+            showSignedOut();
+            if (window._organizeMeSyncHandler) {
+              window.removeEventListener('OrganizeMeTasksChanged', window._organizeMeSyncHandler);
+              window._organizeMeSyncHandler = null;
+            }
+          }
+        });
+
+        // UI hookups
+        $('signin-btn').onclick = async () => {
+          try {
+            await signInWithEmailAndPassword(auth, $('signin-email').value.trim(), $('signin-password').value);
+          } catch (e) { alert(e.message || 'Sign-in failed'); console.error(e); }
+        };
+        $('signup-btn').onclick = async () => {
+          const email = $('signup-email').value.trim();
+          const p1 = $('signup-password').value;
+          const p2 = $('signup-confirm').value;
+          if (p1 !== p2) return alert('Passwords do not match');
+          try {
+            await createUserWithEmailAndPassword(auth, email, p1);
+          } catch (e) { alert(e.message || 'Sign-up failed'); console.error(e); }
+        };
+        $('signout-btn').onclick = async () => {
+          try { await signOut(auth); } catch (e) { alert(e.message || 'Sign-out failed'); console.error(e); }
+        };
+        $('to-signup').onclick = ()=>{ $('signin-form').style.display='none'; $('signup-form').style.display='flex'; };
+        $('to-signin').onclick = ()=>{ $('signup-form').style.display='none'; $('signin-form').style.display='flex'; };
+
+      } catch (err) {
+        console.error('Firebase (module) init failed', err);
+      }
+    `;
+    document.body.appendChild(m);
+
+    // Then run the fallback app (task UI) which exposes window.OrganizeMe
+    runFallbackApp();
+  };
+  document.body.appendChild(s);
+
+  // If ext style fails to load, fallback style stays applied
+  var extStyle = document.getElementById('ext-style');
+  extStyle.onerror = function(){ window.__styleLoaded=false; /* fallback used */ };
+})();
+</script>
+
+<!-- ============================
+     Fallback in-browser task app
+     Exposes window.OrganizeMe API:
+       - getTasks()
+       - replaceTasks(array)
+       - dispatchChange()  (fires OrganizeMeTasksChanged event)
+   ============================ -->
+<script>
+function runFallbackApp(){
+  if (window.__organizeMeFallbackRan) return;
+  window.__organizeMeFallbackRan = true;
+
+  const STORAGE_KEY = 'organizeMe.tasks.v1';
+  let tasks = [];
+  const title = document.getElementById('title');
+  const due = document.getElementById('due');
+  const importance = document.getElementById('importance');
+  const listWrap = document.getElementById('list-wrap');
+  const viewMode = document.getElementById('view-mode');
+  const showComplete = document.getElementById('show-complete');
+
+  function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+  function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||0); }
+  function isDueSoon(d){
+    if(!d) return false;
+    const diff = new Date(d+'T23:59:59').getTime() - Date.now();
+    return diff>0 && diff <= (1000*60*60*24*2);
+  }
+
+  function dispatchChange(){
+    window.dispatchEvent(new Event('OrganizeMeTasksChanged'));
+  }
+
+  function render(){
+    const visible = tasks.filter(t => showComplete.checked ? true : !t.done);
+    if (!visible.length){ listWrap.innerHTML='<div class="empty">No tasks yet — add one above.</div>'; return; }
+    if (viewMode.value === 'date'){
+      visible.sort((a,b) => { if(!a.due && !b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+    } else {
+      visible.sort((a,b)=>{ const imp=importanceRank(b.importance)-importanceRank(a.importance); if(imp) return imp; if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+    }
+
+    const ul = document.createElement('ul'); ul.className='task-list';
+    visible.forEach(t=>{
+      const li = document.createElement('li'); li.className='task';
+      if (t.done) li.classList.add('completed');
+
+      const left = document.createElement('div'); left.style.display='flex'; left.style.gap='10px'; left.style.alignItems='center';
+      const badge = document.createElement('div'); badge.className='badge ' + (t.importance==='High'?'high':t.importance==='Medium'?'med':'low'); badge.textContent = t.importance;
+      const info = document.createElement('div');
+      const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>'+escapeHtml(t.title)+'</strong>';
+      const meta = document.createElement('div'); meta.className='meta';
+      const dueText = t.due ? 'Due '+t.due : 'No due date';
+      const soon = isDueSoon(t.due) && !t.done ? ' • <span style="color:#b91c1c;font-weight:600">due soon</span>' : '';
+      meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
+      info.appendChild(titleEl); info.appendChild(meta);
+      left.appendChild(badge); left.appendChild(info);
+
+      const ctr = document.createElement('div'); ctr.style.display='flex'; ctr.style.gap='8px';
+      const doneBtn = document.createElement('button'); doneBtn.textContent = t.done ? 'Undo' : 'Done';
+      doneBtn.onclick = ()=>{ t.done = !t.done; save(); render(); };
+      const editBtn = document.createElement('button'); editBtn.className='ghost'; editBtn.textContent='Edit';
+      editBtn.onclick = ()=>{ openEdit(t); };
+      const delBtn = document.createElement('button'); delBtn.className='ghost'; delBtn.textContent='Delete';
+      delBtn.onclick = ()=>{ if(confirm('Delete this task?')){ tasks = tasks.filter(x=>x.id!==t.id); save(); render(); } };
+      ctr.appendChild(doneBtn); ctr.appendChild(editBtn); ctr.appendChild(delBtn);
+
+      li.appendChild(left); li.appendChild(ctr);
+      ul.appendChild(li);
+    });
+    listWrap.innerHTML=''; listWrap.appendChild(ul);
+  }
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  function addTask(){
+    const t = { id: uid(), title: title.value.trim(), notes: '', due: due.value || null, importance: importance.value, done:false, createdAt:new Date().toISOString() };
+    if (!t.title) return alert('Give the task a name.');
+    tasks.push(t); save(); render(); title.value=''; due.value=''; importance.value='Medium';
+  }
+
+  function openEdit(task){
+    const newTitle = prompt('Edit title', task.title);
+    if (newTitle === null) return;
+    task.title = newTitle.trim() || task.title;
+    const newNotes = prompt('Edit notes', task.notes||'');
+    if (newNotes !== null) task.notes = newNotes.trim();
+    const newDue = prompt('Due (YYYY-MM-DD) or blank', task.due||'');
+    if (newDue !== null) task.due = newDue.trim() || null;
+    const newImp = prompt('Importance: High / Medium / Low', task.importance) || task.importance;
+    if (['High','Medium','Low'].includes(newImp)) task.importance = newImp;
+    save(); render();
+  }
+
+  function clearAll(){ if(!confirm('Clear all tasks?')) return; tasks=[]; save(); render(); }
+
+  // API methods exposed to Firebase module
+  window.OrganizeMe = {
+    getTasks: () => tasks.slice(),
+    replaceTasks: (arr) => { if(!Array.isArray(arr)) return; tasks = arr.map(t => ({ id: t.id || uid(), title: t.title||'', due: t.due||null, importance: t.importance||'Medium', done: !!t.done, notes: t.notes||'' })); save(); render(); },
+    dispatchChange: dispatchChange
+  };
+
+  // UI hookup
+  window.addEventListener('DOMContentLoaded', ()=>{ /* no-op */});
+  document.getElementById('add-btn').addEventListener('click', addTask);
+  document.getElementById('clear-all').addEventListener('click', ()=>{ clearAll(); });
+
+  viewMode.addEventListener('change', render);
+  showComplete.addEventListener('change', render);
+
+  load(); render();
+}
+</script>
+
+</body>
+</html>
