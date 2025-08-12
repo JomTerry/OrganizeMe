@@ -179,73 +179,6 @@
   s.onload = function(){ console.log('External index.js loaded. Using external script.'); };
   s.onerror = function(){
     console.warn('No external index.js found — running fallback UI logic.');
-    // Load Firebase Web SDK for web fallback auth
-    var f = document.createElement('script');
-    f.type = 'module';
-    f.innerHTML = `
-      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-      const cfg = {
-        apiKey: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) || 'YOUR_API_KEY',
-        authDomain: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.authDomain) || 'YOUR_AUTH_DOMAIN',
-        projectId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) || 'YOUR_PROJECT_ID',
-        storageBucket: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.storageBucket) || 'YOUR_STORAGE_BUCKET',
-        messagingSenderId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.messagingSenderId) || 'YOUR_MESSAGING_SENDER_ID',
-        appId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.appId) || 'YOUR_APP_ID',
-      };
-      const app = initializeApp(cfg);
-      const auth = getAuth(app);
-      const googleProvider = new GoogleAuthProvider();
-      const $ = (id) => document.getElementById(id);
-      function showSignedIn(email){
-        $('signed-in-row').style.display='flex';
-        $('signed-out-row').style.display='none';
-        $('auth-email').textContent = email || '';
-        closeModal();
-      }
-      function showSignedOut(){
-        $('signed-in-row').style.display='none';
-        $('signed-out-row').style.display='flex';
-      }
-      function openModal(){ $('auth-modal').style.display='block'; selectTab('signin'); }
-      function closeModal(){ $('auth-modal').style.display='none'; }
-      function togglePassword(id, btn){ const i=$(id); const on=i.type==='password'; i.type=on?'text':'password'; btn.textContent=on?'Hide':'Show'; }
-      function selectTab(which){
-        const signinActive = which==='signin';
-        $('tab-signin').classList.toggle('active', signinActive);
-        $('tab-signup').classList.toggle('active', !signinActive);
-        $('signin-form').style.display = signinActive ? 'flex' : 'none';
-        $('signup-form').style.display = signinActive ? 'none' : 'flex';
-        $('auth-modal-title').textContent = signinActive ? 'Sign in' : 'Sign up';
-      }
-      onAuthStateChanged(auth, (u)=>{ if(u) showSignedIn(u.email); else showSignedOut(); });
-      $('modal-signin-btn').onclick = async ()=>{
-        try { await signInWithEmailAndPassword(auth, $('modal-signin-email').value.trim(), $('modal-signin-password').value); }
-        catch(e){ alert(e.message || 'Sign-in failed'); }
-      };
-      $('modal-signup-btn').onclick = async ()=>{
-        const email = $('modal-signup-email').value.trim();
-        const p1 = $('modal-signup-password').value;
-        const p2 = $('modal-signup-confirm').value;
-        if(p1!==p2) return alert('Passwords do not match');
-        try { await createUserWithEmailAndPassword(auth, email, p1); }
-        catch(e){ alert(e.message || 'Sign-up failed'); }
-      };
-      $('google-btn').onclick = async ()=>{
-        try { await signInWithPopup(auth, googleProvider); }
-        catch(e){ alert(e.message || 'Google sign-in failed'); }
-      };
-      $('signout-btn').onclick = async ()=>{ try{ await signOut(auth); }catch(e){ alert(e.message || 'Sign-out failed'); } };
-      $('open-auth').onclick = ()=> openModal();
-      $('auth-close').onclick = ()=> closeModal();
-      $('auth-backdrop').onclick = ()=> closeModal();
-      $('tab-signin').onclick = ()=> selectTab('signin');
-      $('tab-signup').onclick = ()=> selectTab('signup');
-      $('toggle-signin-pwd').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signin-password', e.currentTarget); };
-      $('toggle-signup-pwd').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signup-password', e.currentTarget); };
-      $('toggle-signup-confirm').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signup-confirm', e.currentTarget); };
-    `;
-    document.body.appendChild(f);
     runFallbackApp();
   };
   document.body.appendChild(s);
@@ -358,6 +291,32 @@ function runFallbackApp(){
   // expose for debug
   window.OrganizeMe = { load, save, tasks, render };
 }
+</script>
+<script>
+// Minimal modal toggling and password show/hide; index.js should attach actual auth handlers
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function openModal(){ $('auth-modal').style.display='block'; selectTab('signin'); }
+  function closeModal(){ $('auth-modal').style.display='none'; }
+  function togglePassword(id, btn){ const i=$(id); const on=i.type==='password'; i.type=on?'text':'password'; btn.textContent=on?'Hide':'Show'; }
+  function selectTab(which){
+    const signinActive = which==='signin';
+    $('tab-signin').classList.toggle('active', signinActive);
+    $('tab-signup').classList.toggle('active', !signinActive);
+    $('signin-form').style.display = signinActive ? 'flex' : 'none';
+    $('signup-form').style.display = signinActive ? 'none' : 'flex';
+    $('auth-modal-title').textContent = signinActive ? 'Sign in' : 'Sign up';
+  }
+  window.__authUI = { openModal, closeModal, selectTab, togglePassword };
+  $('open-auth').onclick = ()=> openModal();
+  $('auth-close').onclick = ()=> closeModal();
+  $('auth-backdrop').onclick = ()=> closeModal();
+  $('tab-signin').onclick = ()=> selectTab('signin');
+  $('tab-signup').onclick = ()=> selectTab('signup');
+  $('toggle-signin-pwd').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signin-password', e.currentTarget); };
+  $('toggle-signup-pwd').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signup-password', e.currentTarget); };
+  $('toggle-signup-confirm').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signup-confirm', e.currentTarget); };
+})();
 </script>
 </body>
 </html>
