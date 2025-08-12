@@ -1,0 +1,9 @@
+exclude:
+  - node_modules
+  - '**/node_modules/**'
+  - OrganizeMe
+  - public
+  - .github
+  - tmp
+  - dev
+  - vendor
