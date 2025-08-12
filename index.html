@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>OrganizeMe</title>
 
-<!-- Try to load external stylesheet if present -->
+<!-- Optional external CSS (if present) -->
 <link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
+
+<!-- Fallback styles (used if style.css missing) -->
 <style id="fallback-style">
   :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
@@ -34,41 +36,45 @@
 <header>
   <div class="wrap">
     <h1 style="margin:.1rem 0">OrganizeMe</h1>
-    <div style="opacity:.95">Task manager — web fallback included</div>
-    </div>
-  </header>
-  
-  <section class="wrap" id="auth" style="margin-top:14px">
-    <div class="card" style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between">
-      <div id="auth-status" style="flex:1">
-        <div class="row" id="signed-out-row">
-          <strong>Welcome!</strong>
-          <span class="meta">Sign in to sync across devices.</span>
-        </div>
-        <div class="row" id="signed-in-row" style="display:none">
-          <span>Signed in as <strong id="auth-email"></strong></span>
-          <button id="signout-btn" class="ghost" style="margin-left:auto">Sign out</button>
-        </div>
-      </div>
-      <div id="auth-forms" class="row" style="gap:12px">
-        <form id="signin-form" onsubmit="return false;" class="row" style="gap:8px">
-          <input id="signin-email" type="email" placeholder="Email" required />
-          <input id="signin-password" type="password" placeholder="Password" required />
-          <button id="signin-btn">Sign in</button>
-          <button id="to-signup" class="ghost" title="Create an account">Sign up</button>
-        </form>
-        <form id="signup-form" onsubmit="return false;" class="row" style="gap:8px; display:none">
-          <input id="signup-email" type="email" placeholder="Email" required />
-          <input id="signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
-          <input id="signup-confirm" type="password" placeholder="Confirm" minlength="6" required />
-          <button id="signup-btn">Create account</button>
-          <button id="to-signin" class="ghost" title="Have an account?">Sign in</button>
-        </form>
-      </div>
-    </div>
-  </section>
+    <div style="opacity:.95">Task manager — syncs with Firebase when signed in</div>
+  </div>
+</header>
 
-  <main class="wrap" style="margin-top:14px">
+<!-- Authentication UI -->
+<section class="wrap" id="auth" style="margin-top:14px">
+  <div class="card" style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between">
+    <div id="auth-status" style="flex:1">
+      <div class="row" id="signed-out-row">
+        <strong>Welcome!</strong>
+        <span class="meta" style="margin-left:8px">Sign in to sync across devices.</span>
+      </div>
+      <div class="row" id="signed-in-row" style="display:none">
+        <span>Signed in as <strong id="auth-email"></strong></span>
+        <button id="signout-btn" class="ghost" style="margin-left:auto">Sign out</button>
+      </div>
+    </div>
+
+    <div id="auth-forms" class="row" style="gap:12px">
+      <form id="signin-form" onsubmit="return false;" class="row" style="gap:8px">
+        <input id="signin-email" type="email" placeholder="Email" required />
+        <input id="signin-password" type="password" placeholder="Password" required />
+        <button id="signin-btn">Sign in</button>
+        <button id="to-signup" class="ghost" title="Create an account">Sign up</button>
+      </form>
+
+      <form id="signup-form" onsubmit="return false;" class="row" style="gap:8px; display:none">
+        <input id="signup-email" type="email" placeholder="Email" required />
+        <input id="signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
+        <input id="signup-confirm" type="password" placeholder="Confirm" minlength="6" required />
+        <button id="signup-btn">Create account</button>
+        <button id="to-signin" class="ghost" title="Have an account?">Sign in</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- Task UI -->
+<main class="wrap" style="margin-top:14px">
   <section class="card" id="creator">
     <form id="task-form" onsubmit="return false;">
       <div class="form-grid">
@@ -109,80 +115,156 @@
 </main>
 
 <script>
-/*
-  Behavior:
-  - Try to load external index.js by adding <script src="index.js">.
-  - If it fails to load (404), fallback to built-in app implementation below.
-*/
-(function bootstrap(){
-  // Try to load external JS; if fails, run fallback
+/* Bootstrapping: try to load external index.js; if not present, set up Firebase module + fallback app */
+(function initBootstrap(){
   var s = document.createElement('script');
   s.src = 'index.js';
-  s.onload = function(){ console.log('External index.js loaded. Using external script.'); };
+  s.onload = function(){ console.log('External index.js loaded. Using external app code.'); };
   s.onerror = function(){
-    console.warn('No external index.js found — running fallback UI logic.');
-    // Load Firebase Web SDK for web fallback auth
-    var f = document.createElement('script');
-    f.type = 'module';
-    f.innerHTML = `
+    console.warn('No external index.js found — loading Firebase fallback + offline app.');
+
+    // Create an inline ES module script that initializes Firebase and hooks into fallback app
+    var m = document.createElement('script');
+    m.type = 'module';
+    m.textContent = `
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
       import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-      const cfg = {
-        apiKey: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) || 'AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4',
-        authDomain: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.authDomain) || 'AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4',
-        projectId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) || 'jomterryy417-c0c',
-        storageBucket: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.storageBucket) || 'jomterryy417-c0c.firebasestorage.app',
-        messagingSenderId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.messagingSenderId) || '993273611189',
-        appId: (window.FIREBASE_CONFIG && FIREBASE_CONFIG.appId) || '1:993273611189:web:baba2cdc4ff30682904ffc',
+      import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      // Supply your Firebase config here OR define window.FIREBASE_CONFIG before this script runs.
+      const cfg = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG) || {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
       };
-      const app = initializeApp(cfg);
-      const auth = getAuth(app);
-      const $ = (id) => document.getElementById(id);
-      function showSignedIn(email){
-        $('signed-in-row').style.display='flex';
-        $('signed-out-row').style.display='none';
-        $('auth-email').textContent = email || '';
-        $('signin-form').style.display='none';
-        $('signup-form').style.display='none';
+
+      try {
+        const app = initializeApp(cfg);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        console.log("Firebase initialized:", cfg.projectId || "(no projectId set)");
+
+        const $ = id => document.getElementById(id);
+
+        // UI helpers
+        function showSignedIn(email){
+          $('signed-in-row').style.display='flex';
+          $('signed-out-row').style.display='none';
+          $('auth-email').textContent = email || '';
+          $('signin-form').style.display='none';
+          $('signup-form').style.display='none';
+        }
+        function showSignedOut(){
+          $('signed-in-row').style.display='none';
+          $('signed-out-row').style.display='flex';
+          $('signin-form').style.display='flex';
+          $('signup-form').style.display='none';
+          $('auth-email').textContent = '';
+        }
+
+        // Sync helpers (interact with fallback app via window.OrganizeMe)
+        async function pushLocalToRemote(uid){
+          try {
+            if (!window.OrganizeMe) return;
+            const tasks = window.OrganizeMe.getTasks();
+            const ref = doc(db, 'users', uid);
+            await setDoc(ref, { tasks: tasks || [] }, { merge: true });
+            console.log('Uploaded local tasks to Firestore for', uid);
+          } catch (e) { console.warn('pushLocalToRemote failed', e); }
+        }
+
+        async function pullRemoteToLocal(uid){
+          try {
+            const ref = doc(db, 'users', uid);
+            const snap = await getDoc(ref);
+            if (snap.exists()){
+              const data = snap.data() || {};
+              const remoteTasks = data.tasks || [];
+              if (window.OrganizeMe && Array.isArray(remoteTasks)) {
+                window.OrganizeMe.replaceTasks(remoteTasks);
+                console.log('Pulled remote tasks into local for', uid);
+              }
+            } else {
+              // If no remote doc, push local tasks as initial data
+              await pushLocalToRemote(uid);
+            }
+          } catch (e) { console.warn('pullRemoteToLocal failed', e); }
+        }
+
+        // Listen for auth changes
+        onAuthStateChanged(auth, async user => {
+          if (user) {
+            showSignedIn(user.email);
+            // pull remote tasks for this user and then subscribe to local changes
+            await pullRemoteToLocal(user.uid);
+            // Listen for local task changes and push to Firestore (debounced)
+            let syncTimeout = null;
+            const syncHandler = () => {
+              if (syncTimeout) clearTimeout(syncTimeout);
+              syncTimeout = setTimeout(()=>{ pushLocalToRemote(user.uid); }, 800);
+            };
+            window.addEventListener('OrganizeMeTasksChanged', syncHandler);
+            // store for cleanup on sign-out
+            window._organizeMeSyncHandler = syncHandler;
+          } else {
+            showSignedOut();
+            if (window._organizeMeSyncHandler) {
+              window.removeEventListener('OrganizeMeTasksChanged', window._organizeMeSyncHandler);
+              window._organizeMeSyncHandler = null;
+            }
+          }
+        });
+
+        // UI hookups
+        $('signin-btn').onclick = async () => {
+          try {
+            await signInWithEmailAndPassword(auth, $('signin-email').value.trim(), $('signin-password').value);
+          } catch (e) { alert(e.message || 'Sign-in failed'); console.error(e); }
+        };
+        $('signup-btn').onclick = async () => {
+          const email = $('signup-email').value.trim();
+          const p1 = $('signup-password').value;
+          const p2 = $('signup-confirm').value;
+          if (p1 !== p2) return alert('Passwords do not match');
+          try {
+            await createUserWithEmailAndPassword(auth, email, p1);
+          } catch (e) { alert(e.message || 'Sign-up failed'); console.error(e); }
+        };
+        $('signout-btn').onclick = async () => {
+          try { await signOut(auth); } catch (e) { alert(e.message || 'Sign-out failed'); console.error(e); }
+        };
+        $('to-signup').onclick = ()=>{ $('signin-form').style.display='none'; $('signup-form').style.display='flex'; };
+        $('to-signin').onclick = ()=>{ $('signup-form').style.display='none'; $('signin-form').style.display='flex'; };
+
+      } catch (err) {
+        console.error('Firebase (module) init failed', err);
       }
-      function showSignedOut(){
-        $('signed-in-row').style.display='none';
-        $('signed-out-row').style.display='flex';
-        $('signin-form').style.display='flex';
-        $('signup-form').style.display='none';
-      }
-      onAuthStateChanged(auth, (u)=>{ if(u) showSignedIn(u.email); else showSignedOut(); });
-      $('signin-btn').onclick = async ()=>{
-        try { await signInWithEmailAndPassword(auth, $('signin-email').value.trim(), $('signin-password').value); }
-        catch(e){ alert(e.message || 'Sign-in failed'); }
-      };
-      $('signup-btn').onclick = async ()=>{
-        const email = $('signup-email').value.trim();
-        const p1 = $('signup-password').value;
-        const p2 = $('signup-confirm').value;
-        if(p1!==p2) return alert('Passwords do not match');
-        try { await createUserWithEmailAndPassword(auth, email, p1); }
-        catch(e){ alert(e.message || 'Sign-up failed'); }
-      };
-      $('signout-btn').onclick = async ()=>{ try{ await signOut(auth); }catch(e){ alert(e.message || 'Sign-out failed'); } };
-      $('to-signup').onclick = ()=>{ $('signin-form').style.display='none'; $('signup-form').style.display='flex'; };
-      $('to-signin').onclick = ()=>{ $('signup-form').style.display='none'; $('signin-form').style.display='flex'; };
     `;
-    document.body.appendChild(f);
+    document.body.appendChild(m);
+
+    // Then run the fallback app (task UI) which exposes window.OrganizeMe
     runFallbackApp();
   };
   document.body.appendChild(s);
 
-  // If style.css failed to load, the fallback style element stays applied (already in HTML).
+  // If ext style fails to load, fallback style stays applied
   var extStyle = document.getElementById('ext-style');
-  extStyle.onerror = function(){ window.__styleLoaded=false; /* fallback style already present */ };
+  extStyle.onerror = function(){ window.__styleLoaded=false; /* fallback used */ };
 })();
+</script>
 
-/* ============================
-   Fallback in-browser app
-   ============================ */
+<!-- ============================
+     Fallback in-browser task app
+     Exposes window.OrganizeMe API:
+       - getTasks()
+       - replaceTasks(array)
+       - dispatchChange()  (fires OrganizeMeTasksChanged event)
+   ============================ -->
+<script>
 function runFallbackApp(){
-  // keep everything scoped; don't overwrite if an external app already defines functions
   if (window.__organizeMeFallbackRan) return;
   window.__organizeMeFallbackRan = true;
 
@@ -196,13 +278,17 @@ function runFallbackApp(){
   const showComplete = document.getElementById('show-complete');
 
   function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
-  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
   function uid(){ return Math.random().toString(36).slice(2,9); }
   function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||0); }
   function isDueSoon(d){
     if(!d) return false;
     const diff = new Date(d+'T23:59:59').getTime() - Date.now();
     return diff>0 && diff <= (1000*60*60*24*2);
+  }
+
+  function dispatchChange(){
+    window.dispatchEvent(new Event('OrganizeMeTasksChanged'));
   }
 
   function render(){
@@ -268,8 +354,15 @@ function runFallbackApp(){
 
   function clearAll(){ if(!confirm('Clear all tasks?')) return; tasks=[]; save(); render(); }
 
+  // API methods exposed to Firebase module
+  window.OrganizeMe = {
+    getTasks: () => tasks.slice(),
+    replaceTasks: (arr) => { if(!Array.isArray(arr)) return; tasks = arr.map(t => ({ id: t.id || uid(), title: t.title||'', due: t.due||null, importance: t.importance||'Medium', done: !!t.done, notes: t.notes||'' })); save(); render(); },
+    dispatchChange: dispatchChange
+  };
+
   // UI hookup
-  window.addEventListener('DOMContentLoaded', ()=>{ /* no-op: already DOM loaded */});
+  window.addEventListener('DOMContentLoaded', ()=>{ /* no-op */});
   document.getElementById('add-btn').addEventListener('click', addTask);
   document.getElementById('clear-all').addEventListener('click', ()=>{ clearAll(); });
 
@@ -277,10 +370,8 @@ function runFallbackApp(){
   showComplete.addEventListener('change', render);
 
   load(); render();
-
-  // expose for debug
-  window.OrganizeMe = { load, save, tasks, render };
 }
 </script>
+
 </body>
 </html>
