@@ -37,7 +37,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: './'
+          path: './site'
           if-no-files-found: error
           retention-days: 1
       - name: Deploy to GitHub Pages
