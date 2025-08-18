@@ -78,9 +78,15 @@
           <label>Task</label><br>
           <input id="title" placeholder="e.g. Finish report" required />
         </div>
-        <div style="width:140px">
-          <label>Due</label><br>
-          <input id="due" type="date" />
+        <div style="display:flex;gap:8px;width:260px">
+          <div style="flex:1">
+            <label>Due</label><br>
+            <input id="due" type="date" />
+          </div>
+          <div style="width:120px">
+            <label>Time</label><br>
+            <input id="time" type="time" step="60" />
+          </div>
         </div>
         <div style="width:120px">
           <label>Priority</label><br>
@@ -131,6 +137,7 @@ function runFallbackApp(){
   const title = document.getElementById('title');
   const due = document.getElementById('due');
   const importance = document.getElementById('importance');
+  const time = document.getElementById('time');
   const listWrap = document.getElementById('list-wrap');
   const viewMode = document.getElementById('view-mode');
   const showComplete = document.getElementById('show-complete');
@@ -141,8 +148,18 @@ function runFallbackApp(){
   function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||0); }
   function isDueSoon(d){
     if(!d) return false;
-    const diff = new Date(d+'T23:59:59').getTime() - Date.now();
+    const target = d.includes('T') ? new Date(d) : new Date(d+'T23:59:59');
+    const diff = target.getTime() - Date.now();
     return diff>0 && diff <= (1000*60*60*24*2);
+  }
+
+  function formatDueString(d){
+    if(!d) return 'No due date';
+    const date = new Date(d.includes('T') ? d : d+'T00:00');
+    const datePart = date.toLocaleDateString();
+    const hasTime = d.includes('T');
+    const timePart = hasTime ? (' '+date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '';
+    return 'Due '+datePart+timePart;
   }
 
   function dispatchChange(){
@@ -152,10 +169,11 @@ function runFallbackApp(){
   function render(){
     const visible = tasks.filter(t => showComplete.checked ? true : !t.done);
     if (!visible.length){ listWrap.innerHTML='<div class="empty">No tasks yet — add one above.</div>'; return; }
+    const parseDue = (d)=>{ if(!d) return null; return d.includes('T') ? new Date(d) : new Date(d+'T00:00'); };
     if (viewMode.value === 'date'){
-      visible.sort((a,b) => { if(!a.due && !b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+      visible.sort((a,b) => { const da=parseDue(a.due), db=parseDue(b.due); if(!da && !db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
     } else {
-      visible.sort((a,b)=>{ const imp=importanceRank(b.importance)-importanceRank(a.importance); if(imp) return imp; if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1; return new Date(a.due)-new Date(b.due); });
+      visible.sort((a,b)=>{ const imp=importanceRank(b.importance)-importanceRank(a.importance); if(imp) return imp; const da=parseDue(a.due), db=parseDue(b.due); if(!da && !db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
     }
 
     const ul = document.createElement('ul'); ul.className='task-list';
@@ -168,7 +186,7 @@ function runFallbackApp(){
       const info = document.createElement('div');
       const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>'+escapeHtml(t.title)+'</strong>';
       const meta = document.createElement('div'); meta.className='meta';
-      const dueText = t.due ? 'Due '+t.due : 'No due date';
+      const dueText = formatDueString(t.due);
       const soon = isDueSoon(t.due) && !t.done ? ' • <span style="color:#b91c1c;font-weight:600">due soon</span>' : '';
       meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
       info.appendChild(titleEl); info.appendChild(meta);
@@ -192,9 +210,12 @@ function runFallbackApp(){
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
   function addTask(){
-    const t = { id: uid(), title: title.value.trim(), notes: '', due: due.value || null, importance: importance.value, done:false, createdAt:new Date().toISOString() };
+    const dueDate = due.value;
+    const dueTime = time.value;
+    const combined = dueDate ? (dueTime ? (dueDate+'T'+dueTime) : dueDate) : null;
+    const t = { id: uid(), title: title.value.trim(), notes: '', due: combined, importance: importance.value, done:false, createdAt:new Date().toISOString() };
     if (!t.title) return alert('Give the task a name.');
-    tasks.push(t); save(); render(); title.value=''; due.value=''; importance.value='Medium';
+    tasks.push(t); save(); render(); title.value=''; due.value=''; time.value=''; importance.value='Medium';
   }
 
   function openEdit(task){
@@ -203,8 +224,19 @@ function runFallbackApp(){
     task.title = newTitle.trim() || task.title;
     const newNotes = prompt('Edit notes', task.notes||'');
     if (newNotes !== null) task.notes = newNotes.trim();
-    const newDue = prompt('Due (YYYY-MM-DD) or blank', task.due||'');
-    if (newDue !== null) task.due = newDue.trim() || null;
+    const currentDateStr = task.due ? (task.due.split('T')[0]) : '';
+    const currentTimeStr = task.due && task.due.includes('T') ? (task.due.split('T')[1].slice(0,5)) : '';
+    const newDueDate = prompt('Due date (YYYY-MM-DD) or blank', currentDateStr);
+    if (newDueDate === null) { save(); render(); return; }
+    const trimmedDate = (newDueDate||'').trim();
+    let newCombined = null;
+    if (trimmedDate) {
+      const newDueTime = prompt('Due time (HH:MM, 24h) or blank', currentTimeStr);
+      if (newDueTime === null) { save(); render(); return; }
+      const trimmedTime = (newDueTime||'').trim();
+      newCombined = trimmedTime ? (trimmedDate+'T'+trimmedTime) : trimmedDate;
+    }
+    task.due = newCombined;
     const newImp = prompt('Importance: High / Medium / Low', task.importance) || task.importance;
     if (['High','Medium','Low'].includes(newImp)) task.importance = newImp;
     save(); render();
