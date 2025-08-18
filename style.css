@@ -25,10 +25,7 @@ input {
   border: 1px solid #ddd;
 }
 
-input[type="date"],
-input[type="time"] {
-  font-family: inherit;
-}
+
 
 button {
   padding: 10px;
