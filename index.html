@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>OrganizeMe</title>
 
-<!-- External stylesheet (keeps your original look); fallback style stays if this fails -->
+<!-- Try to load external stylesheet if present -->
 <link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
 <style id="fallback-style">
   :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
@@ -28,34 +28,7 @@
   .low{background:#e9f7ff;color:#03506f}
   .empty{text-align:center;color:var(--muted);padding:18px}
   @media(min-width:720px){.form-grid{display:flex;gap:10px;align-items:flex-end}}
-
-  /* Modal styles */
-  .modal{position:fixed;inset:0;display:none;z-index:1000}
-  .modal.show{display:block}
-  .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4)}
-  .modal-card{position:relative;margin:10vh auto;background:#fff;border-radius:12px;max-width:440px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
-  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .icon-btn{background:transparent;border:0;font-size:18px;cursor:pointer;color:#374151}
-  .tab-row{display:flex;gap:8px;margin-bottom:10px}
-  .tab{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;padding:6px 10px;border-radius:999px;cursor:pointer}
-  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-  .col{display:flex;flex-direction:column}
-  .password-field{position:relative;display:flex;align-items:center}
-  .password-field input{flex:1;padding-right:64px}
-  .password-field .toggle{position:absolute;right:6px;background:transparent;border:0;color:#374151;cursor:pointer;padding:4px 8px}
 </style>
-
-<script>
-  // Your Firebase config (used by index.js and by the fallback below if needed)
-  window.FIREBASE_CONFIG = {
-    apiKey: 'AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4',
-    authDomain: 'jomterryy417-c0c.firebaseapp.com',
-    projectId: 'jomterryy417-c0c',
-    storageBucket: 'jomterryy417-c0c.appspot.com',
-    messagingSenderId: '993273611189',
-    appId: '1:993273611189:web:baba2cdc4ff30682904ffc',
-  };
-</script>
 </head>
 <body>
 <header>
@@ -64,7 +37,7 @@
     <div style="opacity:.95">Task manager — web fallback included</div>
   </div>
 </header>
-
+  
 <section class="wrap" id="auth" style="margin-top:14px">
   <div class="card" style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between">
     <div id="auth-status" style="flex:1">
@@ -77,58 +50,25 @@
         <button id="signout-btn" class="ghost" style="margin-left:auto">Sign out</button>
       </div>
     </div>
-    <div class="row" style="gap:12px">
-      <button id="open-auth" class="ghost">Sign in / Sign up</button>
+
+    <div id="auth-forms" class="row" style="gap:12px">
+      <form id="signin-form" onsubmit="return false;" class="row" style="gap:8px">
+        <input id="signin-email" type="email" placeholder="Email" required />
+        <input id="signin-password" type="password" placeholder="Password" required />
+        <button id="signin-btn">Sign in</button>
+        <button id="to-signup" class="ghost" title="Create an account">Sign up</button>
+      </form>
+
+      <form id="signup-form" onsubmit="return false;" class="row" style="gap:8px; display:none">
+        <input id="signup-email" type="email" placeholder="Email" required />
+        <input id="signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
+        <input id="signup-confirm" type="password" placeholder="Confirm" minlength="6" required />
+        <button id="signup-btn">Create account</button>
+        <button id="to-signin" class="ghost" title="Have an account?">Sign in</button>
+      </form>
     </div>
   </div>
 </section>
-
-<!-- Auth Modal (popup with Google and show/hide password) -->
-<div id="auth-modal" class="modal">
-  <div class="modal-backdrop" id="auth-backdrop"></div>
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3 id="auth-modal-title" style="margin:0">Sign in</h3>
-      <button id="auth-close" class="icon-btn" aria-label="Close">✕</button>
-    </div>
-
-    <div class="modal-body">
-      <div class="tab-row">
-        <button id="tab-signin" class="tab active" type="button">Sign in</button>
-        <button id="tab-signup" class="tab" type="button">Sign up</button>
-      </div>
-
-      <div class="col" style="gap:8px;margin-bottom:10px;align-items:stretch">
-        <button id="google-btn" type="button" class="oauth-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:#374151;border:1px solid #e5e7eb">
-          Continue with Google
-        </button>
-        <div class="meta" style="text-align:center">or</div>
-      </div>
-
-      <form id="signin-form" onsubmit="return false;" class="col" style="gap:10px">
-        <input id="modal-signin-email" type="email" placeholder="Email" required />
-        <div class="password-field">
-          <input id="modal-signin-password" type="password" placeholder="Password" required />
-          <button type="button" class="toggle" id="toggle-signin-pwd">Show</button>
-        </div>
-        <button id="modal-signin-btn">Sign in</button>
-      </form>
-
-      <form id="signup-form" onsubmit="return false;" class="col" style="gap:10px; display:none">
-        <input id="modal-signup-email" type="email" placeholder="Email" required />
-        <div class="password-field">
-          <input id="modal-signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
-          <button type="button" class="toggle" id="toggle-signup-pwd">Show</button>
-        </div>
-        <div class="password-field">
-          <input id="modal-signup-confirm" type="password" placeholder="Confirm password" minlength="6" required />
-          <button type="button" class="toggle" id="toggle-signup-confirm">Show</button>
-        </div>
-        <button id="modal-signup-btn">Create account</button>
-      </form>
-    </div>
-  </div>
-</div>
 
 <main class="wrap" style="margin-top:14px">
   <section class="card" id="creator">
@@ -170,100 +110,17 @@
   </section>
 </main>
 
-<script>
-/* Minimal UI logic for modal open/close, tabs, and show/hide toggles */
-(function(){
-  function $(id){ return document.getElementById(id); }
-  function openModal(){ $('auth-modal').classList.add('show'); selectTab('signin'); }
-  function closeModal(){ $('auth-modal').classList.remove('show'); }
-  function togglePassword(id, btn){
-    const i=$(id);
-    const on=i.type==='password';
-    i.type=on?'text':'password';
-    btn.textContent=on?'Hide':'Show';
-  }
-  function selectTab(which){
-    const signinActive = which==='signin';
-    $('tab-signin').classList.toggle('active', signinActive);
-    $('tab-signup').classList.toggle('active', !signinActive);
-    $('signin-form').style.display = signinActive ? 'flex' : 'none';
-    $('signup-form').style.display = signinActive ? 'none' : 'flex';
-    $('auth-modal-title').textContent = signinActive ? 'Sign in' : 'Sign up';
-  }
-  window.__authUI = { openModal, closeModal, selectTab, togglePassword };
-  $('open-auth').onclick = ()=> openModal();
-  $('auth-close').onclick = ()=> closeModal();
-  $('auth-backdrop').onclick = ()=> closeModal();
-  $('tab-signin').onclick = ()=> selectTab('signin');
-  $('tab-signup').onclick = ()=> selectTab('signup');
-  $('toggle-signin-pwd').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signin-password', e.currentTarget); };
-  $('toggle-signup-pwd').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signup-password', e.currentTarget); };
-  $('toggle-signup-confirm').onclick = (e)=>{ e.preventDefault(); togglePassword('modal-signup-confirm', e.currentTarget); };
-})();
-</script>
-
-<script>
-/*
-  Behavior:
-  - Try to load external index.js (wires Firebase Auth: email/password + Google).
-  - If it fails to load, fallback initializes Firebase Web SDK and handlers inline.
-*/
-(function bootstrap(){
-  var s = document.createElement('script');
-  s.src = 'index.js';
-  s.onload = function(){ console.log('External index.js loaded. Using external script.'); };
-  s.onerror = function(){
-    console.warn('No external index.js found — running fallback auth wiring.');
-    (async () => {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-      const authMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-      const cfg = window.FIREBASE_CONFIG || {};
-      const app = initializeApp(cfg);
-      const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } = authMod;
-      const auth = getAuth(app);
-      const $ = (id)=>document.getElementById(id);
-      const ui = window.__authUI || {};
-
-      function showSignedIn(email){
-        $('signed-in-row').style.display='flex';
-        $('signed-out-row').style.display='none';
-        $('auth-email').textContent = email || '';
-        ui.closeModal && ui.closeModal();
-      }
-      function showSignedOut(){
-        $('signed-in-row').style.display='none';
-        $('signed-out-row').style.display='flex';
-      }
-      onAuthStateChanged(auth, (u)=>{ if(u) showSignedIn(u.email); else showSignedOut(); });
-
-      $('modal-signin-btn').onclick = async (e)=>{
-        e.preventDefault();
-        try { await signInWithEmailAndPassword(auth, $('modal-signin-email').value.trim(), $('modal-signin-password').value); }
-        catch(e){ alert(e.message || 'Sign-in failed'); }
-      };
-      $('modal-signup-btn').onclick = async (e)=>{
-        e.preventDefault();
-        const email = $('modal-signup-email').value.trim();
-        const p1 = $('modal-signup-password').value;
-        const p2 = $('modal-signup-confirm').value;
-        if(p1!==p2) return alert('Passwords do not match');
-        try { await createUserWithEmailAndPassword(auth, email, p1); }
-        catch(e){ alert(e.message || 'Sign-up failed'); }
-      };
-      $('google-btn').onclick = async ()=>{
-        try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-        catch(e){ alert(e.message || 'Google sign-in failed'); }
-      };
-      $('signout-btn').onclick = async ()=>{ try{ await signOut(auth); }catch(e){ alert(e.message || 'Sign-out failed'); } };
-    })();
-  };
-  document.body.appendChild(s);
-})();
-</script>
-
+<!--
+  fallback app + local task logic (unchanged behavior, exposed as window.OrganizeMe)
+  We'll call runFallbackApp() immediately so local UI works even if Firebase doesn't initialize.
+-->
 <script>
 /* ============================
-   Fallback in-browser app (unchanged core)
+   Fallback in-browser app
+   Exposes window.OrganizeMe API:
+     - getTasks()
+     - replaceTasks(array)
+     - dispatchChange()  (fires OrganizeMeTasksChanged event)
    ============================ */
 function runFallbackApp(){
   if (window.__organizeMeFallbackRan) return;
@@ -279,13 +136,17 @@ function runFallbackApp(){
   const showComplete = document.getElementById('show-complete');
 
   function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
-  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
   function uid(){ return Math.random().toString(36).slice(2,9); }
   function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||0); }
   function isDueSoon(d){
     if(!d) return false;
     const diff = new Date(d+'T23:59:59').getTime() - Date.now();
     return diff>0 && diff <= (1000*60*60*24*2);
+  }
+
+  function dispatchChange(){
+    window.dispatchEvent(new Event('OrganizeMeTasksChanged'));
   }
 
   function render(){
@@ -308,7 +169,7 @@ function runFallbackApp(){
       const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>'+escapeHtml(t.title)+'</strong>';
       const meta = document.createElement('div'); meta.className='meta';
       const dueText = t.due ? 'Due '+t.due : 'No due date';
-      const soon = isDueSoon(t.due) && !t.done ? " • <span style=\"color:#b91c1c;font-weight:600\">due soon</span>" : '';
+      const soon = isDueSoon(t.due) && !t.done ? ' • <span style="color:#b91c1c;font-weight:600">due soon</span>' : '';
       meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
       info.appendChild(titleEl); info.appendChild(meta);
       left.appendChild(badge); left.appendChild(info);
@@ -328,7 +189,7 @@ function runFallbackApp(){
     listWrap.innerHTML=''; listWrap.appendChild(ul);
   }
 
-  function escapeHtml(s){ return String(s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#39;' }[c])); }
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
   function addTask(){
     const t = { id: uid(), title: title.value.trim(), notes: '', due: due.value || null, importance: importance.value, done:false, createdAt:new Date().toISOString() };
@@ -351,15 +212,176 @@ function runFallbackApp(){
 
   function clearAll(){ if(!confirm('Clear all tasks?')) return; tasks=[]; save(); render(); }
 
-  window.addEventListener('DOMContentLoaded', ()=>{ /* no-op */});
+  // API methods exposed to Firebase module
+  window.OrganizeMe = {
+    getTasks: () => tasks.slice(),
+    replaceTasks: (arr) => { if(!Array.isArray(arr)) return; tasks = arr.map(t => ({ id: t.id || uid(), title: t.title||'', due: t.due||null, importance: t.importance||'Medium', done: !!t.done, notes: t.notes||'' })); save(); render(); },
+    dispatchChange: dispatchChange
+  };
+
+  // UI hookup
+  window.addEventListener('DOMContentLoaded', ()=>{ /* no-op: already DOM loaded */});
   document.getElementById('add-btn').addEventListener('click', addTask);
   document.getElementById('clear-all').addEventListener('click', ()=>{ clearAll(); });
+
   viewMode.addEventListener('change', render);
   showComplete.addEventListener('change', render);
 
   load(); render();
+
+  // expose for debug
   window.OrganizeMe = { load, save, tasks, render };
 }
+// start local fallback app so UI always works
+runFallbackApp();
 </script>
+
+<!-- ============================
+     Firebase auth + Firestore sync (modular v10)
+     This script wires the existing signin/signup buttons to Firebase.
+     Replace window.FIREBASE_CONFIG or the placeholders below with your real project values.
+   ============================ -->
+<script type="module">
+/* IMPORTANT: set your Firebase config in one of two ways:
+   1) Replace the placeholders in `cfg` below, OR
+   2) Add an inline script before this module: <script>window.FIREBASE_CONFIG = { apiKey: "...", ... };</script>
+*/
+
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const cfg = window.FIREBASE_CONFIG || {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let app, auth, db;
+try {
+  app = initializeApp(cfg);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  console.log('Firebase initialized for project:', cfg.projectId);
+} catch (e) {
+  console.warn('Firebase init error:', e);
+  // If Firebase fails to init, we still keep local fallback working
+}
+
+// Short helper
+const $ = id => document.getElementById(id);
+
+// Show/hide helper functions using your existing elements
+function showSignedIn(email){
+  const signedIn = $('signed-in-row');
+  const signedOut = $('signed-out-row');
+  if (signedIn) signedIn.style.display = 'flex';
+  if (signedOut) signedOut.style.display = 'none';
+  const ae = $('auth-email'); if (ae) ae.textContent = email || '';
+  const sf = $('signin-form'); if (sf) sf.style.display = 'none';
+  const su = $('signup-form'); if (su) su.style.display = 'none';
+}
+function showSignedOut(){
+  const signedIn = $('signed-in-row');
+  const signedOut = $('signed-out-row');
+  if (signedIn) signedIn.style.display = 'none';
+  if (signedOut) signedOut.style.display = 'flex';
+  const sf = $('signin-form'); if (sf) sf.style.display = 'flex';
+  const su = $('signup-form'); if (su) su.style.display = 'none';
+  const ae = $('auth-email'); if (ae) ae.textContent = '';
+}
+
+// Sync helpers
+async function pushLocalToRemote(uid){
+  if (!db) return;
+  try {
+    if (!window.OrganizeMe) return;
+    const tasks = window.OrganizeMe.getTasks() || [];
+    const ref = doc(db, 'users', uid);
+    await setDoc(ref, { tasks }, { merge: true });
+    console.log('Uploaded tasks to Firestore for', uid);
+  } catch (e) {
+    console.warn('pushLocalToRemote failed', e);
+  }
+}
+
+async function pullRemoteToLocal(uid){
+  if (!db) return;
+  try {
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()){
+      const data = snap.data() || {};
+      const remoteTasks = data.tasks || [];
+      if (window.OrganizeMe && Array.isArray(remoteTasks)) {
+        window.OrganizeMe.replaceTasks(remoteTasks);
+        console.log('Pulled remote tasks into local for', uid);
+      }
+    } else {
+      // No remote doc yet — upload local as initial
+      await pushLocalToRemote(uid);
+    }
+  } catch (e) {
+    console.warn('pullRemoteToLocal failed', e);
+  }
+}
+
+// Wire up auth state and UI
+if (auth) {
+  onAuthStateChanged(auth, async user => {
+    if (user) {
+      showSignedIn(user.email);
+      // Sync remote -> local and set up local change listener => remote
+      await pullRemoteToLocal(user.uid);
+
+      // Debounced sync handler
+      const syncHandler = () => {
+        if (window._organizeMeSyncTimer) clearTimeout(window._organizeMeSyncTimer);
+        window._organizeMeSyncTimer = setTimeout(()=>{ pushLocalToRemote(user.uid); }, 800);
+      };
+      window._organizeMeSyncHandler = syncHandler;
+      window.addEventListener('OrganizeMeTasksChanged', syncHandler);
+    } else {
+      showSignedOut();
+      if (window._organizeMeSyncHandler) {
+        window.removeEventListener('OrganizeMeTasksChanged', window._organizeMeSyncHandler);
+        window._organizeMeSyncHandler = null;
+      }
+    }
+  });
+}
+
+// Button handlers
+if ($('signin-btn')) {
+  $('signin-btn').addEventListener('click', async () => {
+    try {
+      await signInWithEmailAndPassword(auth, $('signin-email').value.trim(), $('signin-password').value);
+    } catch (e) { alert(e.message || 'Sign-in failed'); console.error(e); }
+  });
+}
+if ($('signup-btn')) {
+  $('signup-btn').addEventListener('click', async () => {
+    const email = $('signup-email').value.trim();
+    const p1 = $('signup-password').value;
+    const p2 = $('signup-confirm').value;
+    if (p1 !== p2) return alert('Passwords do not match');
+    try {
+      await createUserWithEmailAndPassword(auth, email, p1);
+    } catch (e) { alert(e.message || 'Sign-up failed'); console.error(e); }
+  });
+}
+if ($('signout-btn')) {
+  $('signout-btn').addEventListener('click', async () => {
+    try { await signOut(auth); } catch (e) { alert(e.message || 'Sign-out failed'); console.error(e); }
+  });
+}
+if ($('to-signup')) $('to-signup').addEventListener('click', ()=>{ if($('signin-form')) $('signin-form').style.display='none'; if($('signup-form')) $('signup-form').style.display='flex'; });
+if ($('to-signin')) $('to-signin').addEventListener('click', ()=>{ if($('signup-form')) $('signup-form').style.display='none'; if($('signin-form')) $('signin-form').style.display='flex'; });
+
+</script>
+
 </body>
 </html>
