@@ -3,7 +3,8 @@ import { User, AuthContextType } from '../types';
 import AuthService from '../services/auth';
 import DatabaseService from '../services/database';
 import { auth } from '../services/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
+import SyncService from '../services/sync';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -58,6 +59,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
 
           setUser(localUser || null);
+
+          // After login, pull cloud tasks, then push local changes back (initial sync)
+          if (localUser && fbUser.uid) {
+            await SyncService.pullCloudTasksToLocal(localUser.user_id, fbUser.uid);
+            await SyncService.pushLocalTasksToCloud(localUser.user_id, fbUser.uid);
+          }
         } catch (innerErr) {
           console.error('Auth state mapping error:', innerErr);
           setUser(null);
@@ -65,6 +72,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsLoading(false);
         }
       });
+
+      // Handle Google redirect sign-in result (web platforms)
+      try {
+        const redirectResult = await getRedirectResult(auth);
+        if (redirectResult && redirectResult.user) {
+          // User is already handled by onAuthStateChanged above
+        }
+      } catch (e) {
+        console.warn('Google redirect handling failed:', e);
+      }
     } catch (error) {
       console.error('Auth initialization error:', error);
       setIsLoading(false);

@@ -14,6 +14,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, Task, ViewMode } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import DatabaseService from '../services/database';
+import SyncService from '../services/sync';
+import { auth } from '../services/firebase';
 import TaskCard from '../components/TaskCard';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -34,6 +36,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     
     setIsLoading(true);
     try {
+      // Pull latest from cloud before loading local
+      const uid = auth.currentUser?.uid || user.email;
+      await SyncService.pullCloudTasksToLocal(user.user_id, uid);
       const userTasks = await DatabaseService.getTasksByUserId(user.user_id);
       setTasks(userTasks);
     } catch (error) {
@@ -62,6 +67,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (!task) return;
 
       await DatabaseService.updateTask(taskId, { completed: !task.completed });
+      const uid = auth.currentUser?.uid || user!.email;
+      await SyncService.pushLocalTasksToCloud(user!.user_id, uid);
       await loadTasks();
     } catch (error) {
       console.error('Error toggling task completion:', error);
@@ -76,6 +83,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const handleDeleteTask = async (taskId: number) => {
     try {
       await DatabaseService.deleteTask(taskId);
+      if (user) {
+        const uid = auth.currentUser?.uid || user.email;
+        await SyncService.pushLocalTasksToCloud(user.user_id, uid);
+      }
       await loadTasks();
     } catch (error) {
       console.error('Error deleting task:', error);

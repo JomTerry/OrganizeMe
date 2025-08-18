@@ -194,7 +194,7 @@ class DatabaseService {
   async getTasksByUserId(userId: number): Promise<Task[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const query = 'SELECT * FROM Tasks WHERE user_id = ? ORDER BY created_at DESC';
+    const query = 'SELECT * FROM Tasks WHERE user_id = ? ORDER BY updated_at DESC';
     const result = await this.db.executeSql(query, [userId]);
 
     const tasks: Task[] = [];

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DatabaseService from './database';
 import { User } from '../types';
 import { auth } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 
 const CURRENT_USER_KEY = 'current_user';
 const FIREBASE_PASSWORD_SENTINEL = 'firebase_auth';
@@ -37,6 +37,37 @@ class AuthService {
       return null;
     } catch (error) {
       console.error('Login error:', error);
+      throw error;
+    }
+  }
+
+  // Support Google sign-in via ID token from web redirect/native SDKs
+  async loginWithGoogleIdToken(idToken: string): Promise<User | null> {
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const result = await signInWithCredential(auth, credential);
+      const fbUser = result.user;
+
+      const email = fbUser.email || '';
+      let localUser = await DatabaseService.getUserByEmail(email);
+      if (!localUser) {
+        const userId = await DatabaseService.createUser({
+          name: fbUser.displayName || email.split('@')[0] || 'User',
+          email,
+          password: FIREBASE_PASSWORD_SENTINEL,
+          birthday: '1970-01-01',
+          phone_number: fbUser.phoneNumber || '',
+        });
+        localUser = await DatabaseService.getUserById(userId);
+      }
+
+      if (localUser) {
+        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(localUser));
+        return localUser;
+      }
+      return null;
+    } catch (error) {
+      console.error('Google login error:', error);
       throw error;
     }
   }

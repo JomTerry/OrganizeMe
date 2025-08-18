@@ -18,6 +18,7 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, Task } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import DatabaseService from '../services/database';
+import SyncService from '../services/sync';
 
 type AddTaskScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AddTask'>;
 type AddTaskScreenRouteProp = RouteProp<RootStackParamList, 'AddTask'>;
@@ -108,6 +109,9 @@ const AddTaskScreen: React.FC<Props> = ({ navigation, route }) => {
       } else {
         await DatabaseService.createTask(taskData);
       }
+
+      // Push changes to cloud for sync
+      await SyncService.pushLocalTasksToCloud(user.user_id, (user as any).uid || user.email);
 
       navigation.goBack();
     } catch (error: any) {
