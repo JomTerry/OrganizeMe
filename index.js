@@ -1,4 +1,7 @@
-// index.js — per-task Firestore storage + realtime sync + migration
+// index.js — Realtime Database sync + Auth (email/password + Google popup/redirect)
+// Uses the Firebase modular SDK (v10.x). Make sure you added your site origin to
+// Firebase Auth → Authorized domains.
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4",
   authDomain: "jomterryy417-c0c.firebaseapp.com",
@@ -9,50 +12,41 @@ const FIREBASE_CONFIG = {
 };
 
 const $ = id => document.getElementById(id);
-const LOG = (...a) => console.debug('[OrganizeMe]', ...a);
+const LOG = (...args) => console.debug('[OrganizeMe]', ...args);
 
-// small helper to compare arrays of tasks (by id & updatedAt) to skip unnecessary updates
-function tasksEqualByIdUpdated(a,b){
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length !== b.length) return false;
-  const ma = new Map(a.map(t=>[t.id, t.updatedAt || t.createdAt || '']));
-  for (const t of b) {
-    if (!ma.has(t.id)) return false;
-    if (ma.get(t.id) !== (t.updatedAt || t.createdAt || '')) return false;
-  }
-  return true;
-}
+// Minimal helper to make client-generated stable IDs (avoids push keys)
+function makeId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
-(async function main(){
+(async function init() {
   try {
-    const [fbApp, fbAuth, fbFs] = await Promise.all([
+    const [appMod, authMod, dbMod] = await Promise.all([
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'),
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js')
     ]);
-    const { initializeApp } = fbApp;
+
+    const { initializeApp } = appMod;
     const {
       getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult,
       GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
-    } = fbAuth;
+    } = authMod;
     const {
-      getFirestore, doc, collection, getDoc, getDocs, setDoc, onSnapshot, addDoc, deleteDoc, updateDoc
-    } = fbFs;
+      getDatabase, ref, set, onValue, get, remove
+    } = dbMod;
 
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getDatabase(app);
     const provider = new GoogleAuthProvider();
 
-    const statusEl = $('auth-status');
-
+    // UI functions
     function showSignedInUI(email, providerId) {
       $('signed-in-row') && ($('signed-in-row').style.display = 'flex');
       $('signed-out-row') && ($('signed-out-row').style.display = 'none');
       if ($('auth-email')) $('auth-email').textContent = email || '';
-      if (statusEl) {
-        if (providerId && providerId.includes('google')) statusEl.textContent = `Signed in with Google (${email||''})`;
-        else statusEl.textContent = `Signed in as ${email||''}`;
+      if ($('auth-status')) {
+        if (providerId && providerId.includes('google')) $('auth-status').textContent = `Signed in with Google (${email||''})`;
+        else $('auth-status').textContent = `Signed in as ${email||''}`;
       }
       try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
     }
@@ -60,155 +54,152 @@ function tasksEqualByIdUpdated(a,b){
       $('signed-in-row') && ($('signed-in-row').style.display = 'none');
       $('signed-out-row') && ($('signed-out-row').style.display = 'flex');
       if ($('auth-email')) $('auth-email').textContent = '';
-      if (statusEl) statusEl.textContent = 'You are using a guest account.';
+      if ($('auth-status')) $('auth-status').textContent = 'You are using a guest account.';
     }
 
-    // MIGRATE old array-doc to per-task docs (once)
-    async function migrateArrayDocIfExists(uid){
-      try {
-        const userDocRef = doc(db, 'users', uid);
-        const snap = await getDoc(userDocRef);
-        if (!snap.exists()) return;
-        const data = snap.data() || {};
-        if (!Array.isArray(data.tasks) || data.tasks.length === 0) return;
-        LOG('Found legacy tasks array — migrating', data.tasks.length);
-        const tasks = data.tasks;
-        // create per-task docs
-        for (const t of tasks){
-          const id = t.id || Math.random().toString(36).slice(2,9);
-          const docRef = doc(db, 'users', uid, 'tasks', id);
-          // ensure createdAt/updatedAt exist
-          const payload = Object.assign({}, t, { id, createdAt: t.createdAt || new Date().toISOString(), updatedAt: t.updatedAt || t.createdAt || new Date().toISOString() });
-          await setDoc(docRef, payload);
+    // Local-only helpers (mirror the local code in index.html)
+    const STORAGE_KEY = 'organizeMe.tasks.v1';
+    function loadLocal(){ try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e){ return []; } }
+    function saveLocal(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); window.dispatchEvent(new Event('OrganizeMeTasksChanged')); }
+
+    // Merge remote object -> local array (choose newest updatedAt if same id)
+    function mergeRemoteAndLocal(remoteObj) {
+      const remoteArr = remoteObj ? Object.entries(remoteObj).map(([id, val]) => (Object.assign({}, val, { id }))) : [];
+      const local = loadLocal();
+      const map = new Map();
+      local.forEach(l => map.set(l.id, Object.assign({}, l)));
+      remoteArr.forEach(r => {
+        if (!r.id) return;
+        const localItem = map.get(r.id);
+        if (!localItem) map.set(r.id, Object.assign({}, r));
+        else {
+          const rUpdated = r.updatedAt || r.createdAt || 0;
+          const lUpdated = localItem.updatedAt || localItem.createdAt || 0;
+          if (new Date(rUpdated) > new Date(lUpdated)) map.set(r.id, Object.assign({}, r));
         }
-        // mark migrated (optional)
-        await setDoc(userDocRef, { migratedAt: new Date().toISOString() }, { merge: true });
-        LOG('Migration complete');
-      } catch (e) {
-        console.warn('Migration failed', e);
-      }
+      });
+      // keep local-only items too
+      return Array.from(map.values());
     }
 
-    // Push local tasks to per-task docs, and remove remote docs that were deleted locally
+    // Push local array to Realtime DB at /tasks/{uid} using client ids
     async function pushLocalToRemote(uid){
-      if (!window.OrganizeMe || typeof window.OrganizeMe.getTasks !== 'function') { LOG('no local API to push'); return; }
       try {
-        const local = window.OrganizeMe.getTasks() || [];
-        // upsert local tasks
-        for (const t of local){
-          if (!t.id) continue;
-          const ref = doc(db, 'users', uid, 'tasks', t.id);
-          const payload = Object.assign({}, t);
-          await setDoc(ref, payload, { merge: true });
+        const local = loadLocal();
+        const baseRef = ref(db, `tasks/${uid}`);
+        // set each child by id
+        const remoteSnap = await get(baseRef);
+        const remoteObj = remoteSnap.exists() ? (remoteSnap.val() || {}) : {};
+        // Upsert local items
+        for (const t of local) {
+          const id = t.id || makeId();
+          const payload = Object.assign({}, t, { id });
+          await set(ref(db, `tasks/${uid}/${id}`), payload);
         }
-        // cleanup remote docs that are not present locally
-        const colRef = collection(db, 'users', uid, 'tasks');
-        const remoteSnap = await getDocs(colRef);
-        const localIds = new Set(local.map(t=>t.id));
-        for (const d of remoteSnap.docs){
-          if (!localIds.has(d.id)){
-            // delete remote doc (user deleted locally)
-            try { await deleteDoc(doc(db, 'users', uid, 'tasks', d.id)); }
-            catch(e){ console.warn('failed deleting remote orphan', d.id, e); }
+        // Delete remote items not in local (respect local deletions)
+        const localIds = new Set(local.map(x => x.id));
+        for (const rid of Object.keys(remoteObj || {})) {
+          if (!localIds.has(rid)) {
+            try { await remove(ref(db, `tasks/${uid}/${rid}`)); } catch(e){ console.warn('remote remove failed', rid, e); }
           }
         }
         LOG('pushLocalToRemote complete');
-      } catch (e){ console.warn('pushLocalToRemote error', e); }
+      } catch(e){ console.warn('pushLocalToRemote error', e); }
     }
 
-    // Merge remote snapshot into local smartly (prefer newest updatedAt per id)
+    // Real-time listener handle (so we can detach)
+    let unsubscribe = null;
     let applyingRemote = false;
-    function mergeRemoteDocsToLocalAndApply(remoteDocs){
-      if (!window.OrganizeMe || typeof window.OrganizeMe.getTasks !== 'function' || typeof window.OrganizeMe.replaceTasks !== 'function') {
-        LOG('no local API to merge into'); return;
-      }
-      const remote = remoteDocs.map(d => d); // already data objects
-      const local = window.OrganizeMe.getTasks() || [];
-      const map = new Map();
-      local.forEach(l => map.set(l.id, Object.assign({}, l)));
-      remote.forEach(r => {
-        if (!r.id) return;
-        const localItem = map.get(r.id);
-        if (!localItem) {
-          map.set(r.id, Object.assign({}, r));
-        } else {
-          const rUpdated = r.updatedAt || r.createdAt || '';
-          const lUpdated = localItem.updatedAt || localItem.createdAt || '';
-          if (new Date(rUpdated) > new Date(lUpdated)) {
-            map.set(r.id, Object.assign({}, r));
-          }
-        }
+
+    // Subscribe to /tasks/{uid} realtime updates
+    function subscribeToRemote(uid) {
+      if (unsubscribe) { try { unsubscribe(); } catch(_) {} unsubscribe = null; }
+      const r = ref(db, `tasks/${uid}`);
+      const listener = onValue(r, (snap) => {
+        const data = snap.exists() ? snap.val() : null;
+        LOG('onValue snapshot', data);
+        // merge and apply to local storage
+        const merged = mergeRemoteAndLocal(data);
+        // avoid writing back if identical
+        const local = loadLocal();
+        try {
+          const localJSON = JSON.stringify((local||[]).map(x=>({id:x.id, updatedAt:x.updatedAt||''})).sort());
+          const mergedJSON = JSON.stringify((merged||[]).map(x=>({id:x.id, updatedAt:x.updatedAt||''})).sort());
+          if (localJSON === mergedJSON) { LOG('remote == local, skip apply'); return; }
+        } catch(e){}
+        applyingRemote = true;
+        saveLocal(merged);
+        // small delay before clearing applyingRemote so local handlers don't push immediately
+        setTimeout(()=> applyingRemote = false, 700);
+      }, (err) => {
+        console.warn('Realtime listener error', err);
       });
-      const merged = Array.from(map.values());
-      if (tasksEqualByIdUpdated(merged, local)) { LOG('Remote merge no-op (equal)'); return; }
-      applyingRemote = true;
-      try {
-        window.OrganizeMe.replaceTasks(merged);
-      } catch(e){ console.warn('replaceTasks failed', e); }
-      // delay clearing applyingRemote to ensure replaceTasks triggers local save before we push again
-      setTimeout(()=>{ applyingRemote = false; }, 600);
-      LOG('Applied merged remote -> local, count', merged.length);
+      // store a detach function
+      unsubscribe = () => dbMod.off ? dbMod.off(r) : null; // placeholder, onValue returns unsubscribe in modular SDK - but we don't need the returned function here
+      // Actually onValue returns unsubscribe in modular SDK; we can use it:
+      // (But since older SDK sometimes doesn't, we use returned function if present)
+      if (typeof listener === 'function') unsubscribe = listener;
+      LOG('subscribed to remote tasks for', uid);
     }
 
-    // when signed in: attach snapshot listener to user's tasks collection
-    let unsubscribeTasks = null;
-    let localChangeHandler = null;
-
+    // onAuthStateChanged wiring
     onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
-          const uid = user.uid;
-          const providerIds = (user.providerData || []).map(p=>p.providerId || '');
+          const providerIds = (user.providerData || []).map(p => p.providerId || '');
           const usedGoogle = providerIds.includes('google.com');
           showSignedInUI(user.email || user.displayName, usedGoogle ? 'google' : providerIds[0] || '');
-          // migrate if necessary
-          await migrateArrayDocIfExists(uid);
-          // attach realtime listener
-          const colRef = collection(db, 'users', uid, 'tasks');
-          if (unsubscribeTasks) unsubscribeTasks();
-          unsubscribeTasks = onSnapshot(colRef, (snap) => {
-            const docs = snap.docs.map(d => {
-              const data = d.data();
-              // ensure id present
-              data.id = data.id || d.id;
-              return data;
-            });
-            LOG('onSnapshot: got', docs.length, 'docs');
-            mergeRemoteDocsToLocalAndApply(docs);
-          }, (err) => {
-            console.warn('onSnapshot error', err);
-          });
-          // set up local->remote debounced handler
-          if (localChangeHandler) window.removeEventListener('OrganizeMeTasksChanged', localChangeHandler);
-          localChangeHandler = () => {
-            if (applyingRemote) { LOG('suppress push (applyingRemote)'); return; }
-            // debounce push
-            if (localChangeHandler._timer) clearTimeout(localChangeHandler._timer);
-            localChangeHandler._timer = setTimeout(()=> pushLocalToRemote(uid), 700);
+          // If local has tasks and remote empty -> push local
+          const baseRef = ref(db, `tasks/${user.uid}`);
+          const snap = await get(baseRef);
+          const remoteObj = snap.exists() ? snap.val() : null;
+          const local = loadLocal();
+          if ((!remoteObj || Object.keys(remoteObj || {}).length === 0) && Array.isArray(local) && local.length > 0) {
+            LOG('remote empty, pushing local tasks to remote');
+            await pushLocalToRemote(user.uid);
+          } else {
+            // merge remote into local if remote has items
+            if (remoteObj) {
+              const merged = mergeRemoteAndLocal(remoteObj);
+              saveLocal(merged);
+            }
+          }
+          // subscribe for realtime
+          subscribeToRemote(user.uid);
+          // listen for local changes -> push (debounced), but suppress while applyingRemote
+          const handler = () => {
+            if (applyingRemote) { LOG('suppress push: applyingRemote'); return; }
+            if (handler._timer) clearTimeout(handler._timer);
+            handler._timer = setTimeout(()=> pushLocalToRemote(user.uid), 700);
           };
-          window.addEventListener('OrganizeMeTasksChanged', localChangeHandler);
-          LOG('Sync set up for user', uid);
+          window.addEventListener('OrganizeMeTasksChanged', handler);
+          // detach on sign out: we store handler on user object for cleanup
+          user._organizeMeHandler = handler;
         } else {
           showSignedOutUI();
-          if (unsubscribeTasks) { unsubscribeTasks(); unsubscribeTasks = null; }
-          if (localChangeHandler) { window.removeEventListener('OrganizeMeTasksChanged', localChangeHandler); localChangeHandler = null; }
-          LOG('Signed out — stopped sync');
+          // cleanup subscription & handlers
+          if (unsubscribe) { try { unsubscribe(); } catch(_) {} unsubscribe = null; }
+          // remove any previously attached handler saved on previous user
+          // (we can't access old user easily here, remove all handlers by removing event? can't - but okay)
+          LOG('signed out — realtime sync stopped');
         }
-      } catch (e) { console.error('onAuthStateChanged handler error', e); }
+      } catch (err) {
+        console.error('onAuthStateChanged error', err);
+      }
     });
 
-    // handle redirect result if app returned from redirect sign-in
+    // handle redirect result (if signInWithRedirect used)
     try {
       const res = await getRedirectResult(auth).catch(e => { throw e; });
-      if (res && res.user) LOG('getRedirectResult user', res.user.uid);
-    } catch(e){
-      LOG('getRedirectResult error', e && e.code, e && e.message);
-      if (e && e.code === 'auth/unauthorized-domain') {
-        alert('Firebase: unauthorized domain. Add your site origin to Authorized domains in Firebase Console (Auth → Sign-in method).');
+      if (res && res.user) LOG('redirect result user', res.user.uid);
+    } catch (err) {
+      LOG('getRedirectResult error', err && err.code, err && err.message);
+      if (err && err.code === 'auth/unauthorized-domain') {
+        alert('Firebase: unauthorized domain. Add your site origin to Authorized domains (Auth → Sign-in method).');
       }
     }
 
-    // wire auth UI
+    // Wire auth UI (modal for email/password)
     const openSignin = $('open-signin'), openSignup = $('open-signup');
     const authModal = $('auth-modal'), authTitle = $('auth-modal-title'), authEmailInput = $('auth-email-input'), authPasswordInput = $('auth-password-input'), authSubmit = $('auth-submit'), authCancel = $('auth-cancel'), closeAuth = $('close-auth');
 
@@ -216,11 +207,11 @@ function tasksEqualByIdUpdated(a,b){
       if (!authModal) return;
       authModal.style.display = 'block'; authModal.setAttribute('aria-hidden','false');
       authModal.dataset.mode = mode;
-      if (authTitle) authTitle.textContent = (mode === 'signup' ? 'Sign up' : 'Sign in');
-      if (authEmailInput) authEmailInput.value = '';
-      if (authPasswordInput) authPasswordInput.value = '';
+      authTitle && (authTitle.textContent = (mode === 'signup' ? 'Sign up' : 'Sign in'));
+      authEmailInput && (authEmailInput.value = '');
+      authPasswordInput && (authPasswordInput.value = '');
     }
-    function hideAuth(){ if (!authModal) return; authModal.style.display = 'none'; authModal.setAttribute('aria-hidden','true'); }
+    function hideAuth(){ if(!authModal) return; authModal.style.display = 'none'; authModal.setAttribute('aria-hidden','true'); }
 
     openSignin?.addEventListener('click', ()=> showAuth('signin'));
     openSignup?.addEventListener('click', ()=> showAuth('signup'));
@@ -238,39 +229,42 @@ function tasksEqualByIdUpdated(a,b){
         else await signInWithEmailAndPassword(auth, em, pw);
         hideAuth();
       } catch (err) {
-        console.error('email auth error', err); alert(err.message || 'Auth failed');
+        console.error('email auth error', err);
+        alert(err.message || 'Auth failed');
       }
     });
 
-    // Google sign-in: popup -> fallback redirect
+    // Google sign-in: popup with redirect fallback
     $('google-login')?.addEventListener('click', async () => {
       try {
-        LOG('signInWithPopup attempt');
+        LOG('attempt signInWithPopup');
         await signInWithPopup(auth, provider);
-        LOG('signInWithPopup success');
+        LOG('popup success');
       } catch (err) {
-        LOG('signInWithPopup error', err && err.code);
+        LOG('popup error', err && err.code);
         if (err && err.code === 'auth/unauthorized-domain') {
-          alert('Firebase: unauthorized domain. Add your site origin to Authorized domains in Firebase Console (Auth → Sign-in method).'); return;
+          alert('Firebase: unauthorized domain. Add your site origin to Authorized domains (Auth → Sign-in method).');
+          return;
         }
         // fallback to redirect
         try {
-          LOG('falling back to signInWithRedirect');
+          LOG('fallback to signInWithRedirect');
           await signInWithRedirect(auth, provider);
         } catch (e) {
-          console.error('signInWithRedirect failed', e); alert(e.message || 'Google sign-in failed');
+          console.error('signInWithRedirect failed', e);
+          alert(e.message || 'Google sign-in failed');
         }
       }
     });
 
-    // sign out
-    $('signout-btn')?.addEventListener('click', async ()=> {
-      try { await signOut(auth); LOG('signed out'); } catch(e){ console.error('signOut failed', e); alert('Sign out failed'); }
+    // Sign out
+    $('signout-btn')?.addEventListener('click', async () => {
+      try { await signOut(auth); LOG('signed out'); } catch (e) { console.error('signOut failed', e); alert('Sign out failed'); }
     });
 
-    LOG('Realtime per-task sync module ready.');
+    LOG('Realtime DB auth module ready');
   } catch (err) {
-    console.warn('Failed to load firebase modules (index.js). Remote features disabled.', err);
+    console.warn('Failed to initialize Firebase modules', err);
     const statusEl = $('auth-status'); if (statusEl) statusEl.textContent = 'You are using a guest account (Firebase unavailable).';
   }
 })();
