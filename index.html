@@ -22,6 +22,7 @@
     </div>
 
     <div class="auth-area">
+      <!-- shown when signed OUT -->
       <div id="signed-out-row" class="meta-row">
         <button id="open-signin" class="ghost">Sign in</button>
         <button id="open-signup" class="ghost">Sign up</button>
@@ -30,6 +31,7 @@
         </button>
       </div>
 
+      <!-- shown when signed IN -->
       <div id="signed-in-row" class="meta-row" style="display:none">
         <span class="meta">Signed in as <strong id="auth-email"></strong></span>
         <button id="signout-btn" class="ghost">Sign out</button>
@@ -119,13 +121,16 @@
 
 <!-- Local fallback task app (offline-first) -->
 <script>
-/* Local fallback: exposes window.OrganizeMe API used by index.js. */
+/*
+  Local fallback: stores tasks in localStorage and exposes window.OrganizeMe API.
+  Task schema: { id, title, notes, due, importance, done, createdAt, updatedAt }
+*/
 (function () {
   const STORAGE_KEY = 'organizeMe.tasks.v1';
   const $ = id => document.getElementById(id);
   let tasks = [];
 
-  function uid(){ return Math.random().toString(36).slice(2,9); }
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
   function parseDue(s){ if (!s) return null; if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T23:59:59'); return new Date(s); }
   function fmtDue(s){ if(!s) return ''; if (s.includes('T')) { const [d,t] = s.split('T'); return d + ' ' + t; } return s; }
 
@@ -222,6 +227,7 @@
 
   load(); render();
 
+  // expose API for remote script (index.js)
   window.OrganizeMe = {
     getTasks: () => tasks.slice(),
     replaceTasks: (arr) => {
@@ -243,7 +249,7 @@
 })();
 </script>
 
-<!-- Firebase-enabled module (auth + google + firestore document sync) -->
+<!-- Firebase-enabled module (Realtime Database + Auth) -->
 <script type="module" src="index.js" defer></script>
 
 </body>
