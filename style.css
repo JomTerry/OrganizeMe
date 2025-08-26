@@ -1,4 +1,4 @@
-/* style.css — OrganizeMe (always-vertical layout) */
+/* style.css — OrganizeMe (vertical layout + priority colors) */
 :root{
   --bg: #f5f7fb;
   --card: #ffffff;
@@ -26,9 +26,11 @@ header .wrap{display:flex;align-items:center;justify-content:space-between;gap:1
 .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:var(--gutter)}
 .small-note{font-size:13px;color:var(--muted);margin-top:6px}
 
-/* Layout — vertical */
+/* Layout — always vertical */
 .main-grid{display:grid;grid-template-columns:1fr;gap:16px;padding:0 16px}
 .form-grid{display:grid;grid-template-columns:1fr;gap:10px;align-items:stretch}
+.row-row{display:flex;gap:10px;flex-wrap:wrap}
+.date-time{min-width:140px;flex:0 0 140px}
 
 /* Inputs */
 input,textarea,select{padding:8px;border-radius:8px;border:1px solid #e6e9ee;font:inherit;outline:none;width:100%}
@@ -51,13 +53,19 @@ li.task{display:flex;justify-content:space-between;gap:12px;align-items:center;p
 .meta{font-size:13px;color:var(--muted)}
 .soon{color:#b91c1c;font-weight:600}
 
+/* Priority badges */
+.badge{padding:4px 8px;border-radius:999px;font-weight:700;font-size:12px}
+.badge.high{background:#ffe6e6;color:#b91c1c}   /* red */
+.badge.med{background:#fff8dc;color:#b8860b}    /* yellow/orange */
+.badge.low{background:#e9f7ee;color:#05603a}    /* green */
+
 /* Modal */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.45);z-index:50;padding:20px}
 .modal .modal-inner{width:100%;max-width:420px}
 .modal .modal-inner.card{position:relative;padding:18px}
 .modal .modal-close{position:absolute;right:10px;top:10px;border-radius:6px;padding:6px}
 
-/* Mobile fine tuning */
+/* Small screens */
 @media (max-width:420px){
   .wrap{margin:12px auto;padding:0 12px}
   header .wrap{padding:12px}
