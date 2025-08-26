@@ -1,6 +1,4 @@
 /* style.css — OrganizeMe (always-vertical layout) */
-
-/* Theme variables */
 :root{
   --bg: #f5f7fb;
   --card: #ffffff;
@@ -13,11 +11,8 @@
   --gutter: 16px;
   --text: #0f172a;
 }
-
-/* Reset & base */
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);-webkit-font-smoothing:antialiased;color:var(--text)}
-a{color:var(--accent)}
 .wrap{max-width:var(--max-width);margin:18px auto;padding:0 16px}
 
 /* Header */
@@ -29,54 +24,32 @@ header .wrap{display:flex;align-items:center;justify-content:space-between;gap:1
 
 /* Card */
 .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:var(--gutter)}
+.small-note{font-size:13px;color:var(--muted);margin-top:6px}
 
-/* Layout — ALWAYS vertical (single column) */
-.main-grid{
-  display: grid;
-  grid-template-columns: 1fr; /* always stack vertically */
-  gap: 16px;
-  padding: 0 16px;
-}
+/* Layout — vertical */
+.main-grid{display:grid;grid-template-columns:1fr;gap:16px;padding:0 16px}
+.form-grid{display:grid;grid-template-columns:1fr;gap:10px;align-items:stretch}
 
-/* Form grid — always stacked */
-.form-grid{
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  align-items:stretch;
-}
-
-/* Inputs & selects */
-input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], textarea, select{
-  padding:8px;border-radius:8px;border:1px solid #e6e9ee;font:inherit;outline:none;width:100%;
-  background: #fff;
-}
+/* Inputs */
+input,textarea,select{padding:8px;border-radius:8px;border:1px solid #e6e9ee;font:inherit;outline:none;width:100%}
 textarea{min-height:64px;resize:vertical}
 
 /* Buttons */
 button{font:inherit;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;background:var(--accent);color:#fff;min-height:40px}
 button.ghost{background:transparent;color:var(--muted);border:1px solid #e6e9ee}
-button:focus{outline:3px solid rgba(11,99,214,0.15);outline-offset:2px}
 
-/* Small helpers */
-.flex{display:flex;flex-direction:column}
-.date-time{display:flex;flex-direction:column;min-width:120px}
-.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* Google button */
+.google-btn{
+  display:flex;align-items:center;gap:8px;background:#fff;color:#444;font-weight:500;border:1px solid #ddd;border-radius:6px;padding:8px 12px;cursor:pointer;
+}
+.google-btn img{width:18px;height:18px}
+.google-btn:hover{background:#f7f7f7;box-shadow:0 2px 6px rgba(0,0,0,0.05)}
 
 /* Task list */
 .task-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
-li.task{display:flex;flex-direction:row;justify-content:space-between;gap:12px;align-items:center;padding:10px;border-radius:8px;background:#fafafa;border:1px solid #f0f3f7}
-li.task .left{display:flex;gap:10px;align-items:center}
-li.task .info{display:flex;flex-direction:column}
+li.task{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px;border-radius:8px;background:#fafafa;border:1px solid #f0f3f7}
 .meta{font-size:13px;color:var(--muted)}
 .soon{color:#b91c1c;font-weight:600}
-
-/* Controls above list */
-.list-controls{display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
-.list-controls label{display:inline-flex;align-items:center;gap:6px}
-
-/* Empty state */
-.empty{text-align:center;color:var(--muted);padding:18px}
 
 /* Modal */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.45);z-index:50;padding:20px}
@@ -84,45 +57,9 @@ li.task .info{display:flex;flex-direction:column}
 .modal .modal-inner.card{position:relative;padding:18px}
 .modal .modal-close{position:absolute;right:10px;top:10px;border-radius:6px;padding:6px}
 
-/* Responsive tidyups (keeping vertical) */
+/* Mobile fine tuning */
 @media (max-width:420px){
   .wrap{margin:12px auto;padding:0 12px}
   header .wrap{padding:12px}
   button{padding:10px}
-}
-
-/* Accessibility & utility */
-.visually-hidden{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
-.code{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;background:#f3f4f6;padding:2px 6px;border-radius:6px;font-size:0.95em}
-
-/* Small visual polish */
-.header-row .site-title{color:#fff}
-.google-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background-color: #fff;
-  color: #444;
-  font-weight: 500;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.google-btn img {
-  width: 18px;
-  height: 18px;
-}
-
-.google-btn:hover {
-  background-color: #f7f7f7;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.google-btn:active {
-  background-color: #eee;
 }
