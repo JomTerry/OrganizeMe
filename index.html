@@ -7,6 +7,7 @@
 
 <link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
 <style id="fallback-style">
+  /* minimal inline fallback while style.css loads */
   :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg)}
   .wrap{max-width:980px;margin:18px auto;padding:0 16px}
@@ -17,11 +18,10 @@
   <div class="wrap header-row">
     <div>
       <h1 class="site-title">OrganizeMe</h1>
-      <div class="site-sub">Task manager — web fallback included</div>
+      <div class="site-sub">Task manager — web + Android WebView</div>
     </div>
 
     <div class="auth-area">
-      <!-- shown when signed OUT -->
       <div id="signed-out-row" class="meta-row">
         <button id="open-signin" class="ghost">Sign in</button>
         <button id="open-signup" class="ghost">Sign up</button>
@@ -30,7 +30,6 @@
         </button>
       </div>
 
-      <!-- shown when signed IN -->
       <div id="signed-in-row" class="meta-row" style="display:none">
         <span class="meta">Signed in as <strong id="auth-email"></strong></span>
         <button id="signout-btn" class="ghost">Sign out</button>
@@ -118,30 +117,17 @@
   </div>
 </div>
 
-<!-- Local fallback task app (offline-first, exposes window.OrganizeMe) -->
+<!-- Local fallback task app (offline-first) -->
 <script>
-/*
-  - Tasks now include: id, title, notes, due, importance, done, createdAt, updatedAt
-  - Local modifications set updatedAt so merge can choose newest
-  - Exposes: window.OrganizeMe.getTasks(), replaceTasks(arr), dispatchChange()
-*/
+/* Local fallback: exposes window.OrganizeMe API used by index.js. */
 (function () {
   const STORAGE_KEY = 'organizeMe.tasks.v1';
   const $ = id => document.getElementById(id);
   let tasks = [];
 
   function uid(){ return Math.random().toString(36).slice(2,9); }
-
-  function parseDue(s) {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T23:59:59');
-    return new Date(s);
-  }
-  function fmtDue(s){
-    if(!s) return '';
-    if (s.includes('T')) { const [d,t] = s.split('T'); return d + ' ' + t; }
-    return s;
-  }
+  function parseDue(s){ if (!s) return null; if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T23:59:59'); return new Date(s); }
+  function fmtDue(s){ if(!s) return ''; if (s.includes('T')) { const [d,t] = s.split('T'); return d + ' ' + t; } return s; }
 
   function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
@@ -151,14 +137,7 @@
         listWrap = $('list-wrap'), viewMode = $('view-mode'), showComplete = $('show-complete');
 
   function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||2); }
-  function isDueSoon(dueStr){
-    if(!dueStr) return false;
-    const d = parseDue(dueStr);
-    if(!d) return false;
-    const diff = d.getTime() - Date.now();
-    return diff > 0 && diff <= (1000*60*60*24*2);
-  }
-
+  function isDueSoon(dueStr){ if(!dueStr) return false; const d = parseDue(dueStr); if(!d) return false; const diff = d.getTime() - Date.now(); return diff > 0 && diff <= (1000*60*60*24*2); }
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
   function render(){
@@ -173,8 +152,7 @@
 
     const ul = document.createElement('ul'); ul.className='task-list';
     visible.forEach(t=>{
-      const li = document.createElement('li'); li.className='task';
-      if (t.done) li.classList.add('completed');
+      const li = document.createElement('li'); li.className='task'; if (t.done) li.classList.add('completed');
 
       const left = document.createElement('div'); left.style.display='flex'; left.style.gap='10px'; left.style.alignItems='center';
       const badge = document.createElement('div'); badge.className = 'badge ' + (t.importance==='High' ? 'high' : t.importance==='Medium' ? 'med' : 'low'); badge.textContent = t.importance;
@@ -204,7 +182,6 @@
     listWrap.innerHTML=''; listWrap.appendChild(ul);
   }
 
-  // Add / edit / clear
   function addTask(){
     const tTitle = title && title.value.trim();
     const d = dueEl && dueEl.value ? dueEl.value : null;
@@ -236,7 +213,6 @@
 
   function clearAll(){ if(!confirm('Clear all tasks?')) return; tasks=[]; save(); render(); }
 
-  // UI wiring
   try {
     document.getElementById('add-btn')?.addEventListener('click', addTask);
     document.getElementById('clear-all')?.addEventListener('click', clearAll);
@@ -246,12 +222,10 @@
 
   load(); render();
 
-  // expose API
   window.OrganizeMe = {
     getTasks: () => tasks.slice(),
     replaceTasks: (arr) => {
       if (!Array.isArray(arr)) return;
-      // ensure tasks have required fields
       tasks = arr.map(t => ({
         id: t.id || uid(),
         title: t.title || '',
@@ -269,7 +243,7 @@
 })();
 </script>
 
-<!-- Firebase-enabled module (auth + google + firestore sync) -->
+<!-- Firebase-enabled module (auth + google + firestore document sync) -->
 <script type="module" src="index.js" defer></script>
 
 </body>
