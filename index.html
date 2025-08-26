@@ -7,7 +7,7 @@
 
 <link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
 <style id="fallback-style">
-  /* minimal inline fallback so UI doesn't flash unstyled while style.css loads */
+  /* minimal inline fallback while style.css loads */
   :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg)}
   .wrap{max-width:980px;margin:18px auto;padding:0 16px}
@@ -21,28 +21,34 @@
       <div class="site-sub">Task manager — web fallback included</div>
     </div>
 
-  <div class="auth-area">
-  <!-- Row shown when signed OUT -->
-  <div id="signed-out-row" class="meta-row">
-    <button id="open-signin" class="ghost">Sign in</button>
-    <button id="open-signup" class="ghost">Sign up</button>
-    <button id="google-login" class="google-btn">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
-      Continue with Google
-    </button>
-  </div>
+    <div class="auth-area">
+      <!-- shown when signed OUT -->
+      <div id="signed-out-row" class="meta-row">
+        <button id="open-signin" class="ghost">Sign in</button>
+        <button id="open-signup" class="ghost">Sign up</button>
+        <button id="google-login" class="google-btn" aria-label="Sign in with Google">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo"> Continue with Google
+        </button>
+      </div>
 
-  <!-- Row shown when signed IN -->
-  <div id="signed-in-row" class="meta-row" style="display:none">
-    <span class="meta">Signed in as <strong id="auth-email"></strong></span>
-    <button id="signout-btn" class="ghost">Sign out</button>
+      <!-- shown when signed IN -->
+      <div id="signed-in-row" class="meta-row" style="display:none">
+        <span class="meta">Signed in as <strong id="auth-email"></strong></span>
+        <button id="signout-btn" class="ghost">Sign out</button>
+      </div>
+    </div>
   </div>
-</div>
+</header>
 
 <section class="wrap">
   <div class="card" id="auth-card">
     <div class="auth-note">
-    <div class="auth-note"><strong>Welcome!</strong> <span class="meta">Sign in to sync across devices (optional).</span></div>
+      <strong>Welcome!</strong>
+      <span class="meta">Sign in to sync across devices (optional).</span>
+    </div>
+    <!-- status message (guest / signed-in provider message) -->
+    <div id="auth-status" class="small-note meta">You are using a guest account.</div>
+  </div>
 </section>
 
 <main class="wrap main-grid">
@@ -87,7 +93,7 @@
   </section>
 </main>
 
-<!-- Simple modal for sign-in / sign-up (local-only; replace with real Firebase script later) -->
+<!-- Simple modal for sign-in / sign-up -->
 <div id="auth-modal" class="modal" aria-hidden="true">
   <div class="modal-inner card">
     <button class="modal-close ghost" id="close-auth">&times;</button>
@@ -98,130 +104,89 @@
       <div style="display:flex;gap:8px;margin-top:10px">
         <button id="auth-submit">Submit</button>
         <button id="auth-cancel" class="ghost">Cancel</button>
-        <section class="wrap">
-  <div class="card" id="auth-card">
-    <div class="auth-note">
-      <strong>Welcome!</strong> 
-      <span class="meta">Sign in to sync across devices (optional).</span>
-    </div>
-
-    <div class="auth-buttons">
-      <button id="signup">Sign Up</button>
-      <button id="signin">Sign In</button>
-      <button id="google-login">Continue with Google</button>
-    </div>
-  </div>
-</section>
       </div>
     </form>
   </div>
 </div>
 
+<!-- Local fallback task app (offline) -->
 <script>
 /*
-  Minimal, defensive local logic:
-  - Local "auth" (stores email to localStorage) so UI shows signed in state without Firebase.
-  - Local task store with date+time minute precision.
-  - Renders tasks, add, edit (prompt), done, delete, clear all.
-  - Tries to load external index.js if present (for Firebase), but does not require it.
+  Local fallback task manager.
+  Exposes window.OrganizeMe API used by index.js:
+    - getTasks()
+    - replaceTasks(array)
+    - dispatchChange()  -> fires 'OrganizeMeTasksChanged' event
 */
-
 (function () {
-  // Utilities
-  const $ = (id) => document.getElementById(id);
   const STORAGE_KEY = 'organizeMe.tasks.v1';
+  const $ = id => document.getElementById(id);
   let tasks = [];
 
-  // Parse due string to Date (supports YYYY-MM-DD and YYYY-MM-DDTHH:MM)
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+
   function parseDue(s) {
     if (!s) return null;
-    // If date-only (YYYY-MM-DD) -> append T23:59:59 for end of day comparators
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T23:59:59');
     return new Date(s);
   }
   function formatDueForDisplay(s) {
     if (!s) return '';
     if (s.includes('T')) {
-      // separate date and time
-      const [d, t] = s.split('T');
-      return d + ' ' + t;
+      const [d,t] = s.split('T'); return d + ' ' + t;
     }
     return s;
   }
-  function uid(){ return Math.random().toString(36).slice(2,9); }
 
-  // load/save
   function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
   function dispatchChange(){ window.dispatchEvent(new Event('OrganizeMeTasksChanged')); }
 
-  // DOM references
-  const title = $('title');
-  const due = $('due');
-  const time = $('time');
-  const importance = null; // keep priority UI compatible if needed later
-  const listWrap = $('list-wrap');
-  const viewMode = $('view-mode');
-  const showComplete = $('show-complete');
+  const title = $('title'), due = $('due'), time = $('time'), listWrap = $('list-wrap'), viewMode = $('view-mode'), showComplete = $('show-complete');
 
-  // Rendering
   function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||2); }
   function isDueSoon(dueStr){
     if(!dueStr) return false;
     const d = parseDue(dueStr);
     if(!d) return false;
     const diff = d.getTime() - Date.now();
-    return diff > 0 && diff <= (1000*60*60*24*2); // within 48 hours
+    return diff > 0 && diff <= (1000*60*60*24*2);
   }
 
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
   function render(){
-    const visible = tasks.filter(t => showComplete.checked ? true : !t.done);
+    const visible = tasks.filter(t => showComplete && showComplete.checked ? true : !t.done);
     if (!visible.length){ listWrap.innerHTML = '<div class="empty">No tasks yet — add one above.</div>'; return; }
 
     if (viewMode.value === 'date') {
-      visible.sort((a,b) => {
-        const da = parseDue(a.due), db = parseDue(b.due);
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
-        return da - db;
-      });
+      visible.sort((a,b)=>{ const da = parseDue(a.due), db = parseDue(b.due); if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
     } else {
-      visible.sort((a,b) => {
-        // priority not available in UI now; keep original order otherwise by due
-        const ia = importanceRank(a.importance||'Medium'), ib = importanceRank(b.importance||'Medium');
-        if (ia !== ib) return ib - ia;
-        const da = parseDue(a.due), db = parseDue(b.due);
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
-        return da - db;
-      });
+      visible.sort((a,b)=>{ const ia = importanceRank(a.importance||'Medium'), ib = importanceRank(b.importance||'Medium'); if (ia!==ib) return ib-ia; const da = parseDue(a.due), db = parseDue(b.due); if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
     }
 
-    const ul = document.createElement('ul'); ul.className = 'task-list';
-    visible.forEach(t => {
-      const li = document.createElement('li'); li.className = 'task';
+    const ul = document.createElement('ul'); ul.className='task-list';
+    visible.forEach(t=>{
+      const li = document.createElement('li'); li.className='task';
       if (t.done) li.classList.add('completed');
 
       const left = document.createElement('div'); left.style.display='flex'; left.style.gap='10px'; left.style.alignItems='center';
       const info = document.createElement('div');
       const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>' + escapeHtml(t.title) + '</strong>';
-      const meta = document.createElement('div'); meta.className = 'meta';
+      const meta = document.createElement('div'); meta.className='meta';
       const dueText = t.due ? 'Due ' + formatDueForDisplay(t.due) : 'No due date';
       const soon = isDueSoon(t.due) && !t.done ? ' • <span class="soon">due soon</span>' : '';
       meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
       info.appendChild(titleEl); info.appendChild(meta);
-
       left.appendChild(info);
 
       const ctr = document.createElement('div'); ctr.style.display='flex'; ctr.style.gap='8px';
       const doneBtn = document.createElement('button'); doneBtn.textContent = t.done ? 'Undo' : 'Done';
-      doneBtn.onclick = () => { t.done = !t.done; save(); render(); };
+      doneBtn.onclick = ()=>{ t.done = !t.done; save(); render(); };
       const editBtn = document.createElement('button'); editBtn.className='ghost'; editBtn.textContent='Edit';
-      editBtn.onclick = () => openEdit(t);
+      editBtn.onclick = ()=> openEdit(t);
       const delBtn = document.createElement('button'); delBtn.className='ghost'; delBtn.textContent='Delete';
-      delBtn.onclick = () => { if(confirm('Delete this task?')){ tasks = tasks.filter(x=>x.id!==t.id); save(); render(); } };
+      delBtn.onclick = ()=>{ if(confirm('Delete this task?')){ tasks = tasks.filter(x=>x.id!==t.id); save(); render(); } };
 
       ctr.appendChild(doneBtn); ctr.appendChild(editBtn); ctr.appendChild(delBtn);
 
@@ -229,12 +194,9 @@
       ul.appendChild(li);
     });
 
-    listWrap.innerHTML = ''; listWrap.appendChild(ul);
+    listWrap.innerHTML=''; listWrap.appendChild(ul);
   }
 
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-
-  // Add / edit / clear
   function addTask(){
     const tTitle = title && title.value.trim();
     const d = due && due.value ? due.value : null;
@@ -245,9 +207,7 @@
     const t = { id: uid(), title: tTitle, notes: '', due: dueStr, importance: 'Medium', done: false, createdAt: new Date().toISOString() };
     if (!t.title) return alert('Give the task a name.');
     tasks.push(t); save(); render();
-    if (title) title.value = '';
-    if (due) due.value = '';
-    if (time) time.value = '';
+    if (title) title.value=''; if (due) due.value=''; if (time) time.value='';
   }
 
   function openEdit(task){
@@ -265,98 +225,24 @@
 
   // UI wiring
   try {
-    if ($('add-btn')) $('add-btn').addEventListener('click', addTask);
-    if ($('clear-all')) $('clear-all').addEventListener('click', clearAll);
-    if (viewMode) viewMode.addEventListener('change', render);
-    if (showComplete) showComplete.addEventListener('change', render);
+    document.getElementById('add-btn')?.addEventListener('click', addTask);
+    document.getElementById('clear-all')?.addEventListener('click', clearAll);
+    viewMode?.addEventListener('change', render);
+    showComplete?.addEventListener('change', render);
   } catch(e){ console.warn('UI wiring failed', e); }
 
-  // load -> render
   load(); render();
 
-  // ----- Local (simple) auth UI so signed-in state shows without Firebase -----
-  const signedInRow = $('signed-in-row'), signedOutRow = $('signed-out-row');
-  const authEmailEl = $('auth-email');
-  function setSignedIn(email){
-    localStorage.setItem('organizeMe.signedIn', JSON.stringify({email: email}));
-    if (signedInRow) signedInRow.style.display = 'flex';
-    if (signedOutRow) signedOutRow.style.display = 'none';
-    if (authEmailEl) authEmailEl.textContent = email || '';
-  }
-  function setSignedOut(){
-    localStorage.removeItem('organizeMe.signedIn');
-    if (signedInRow) signedInRow.style.display = 'none';
-    if (signedOutRow) signedOutRow.style.display = 'flex';
-    if (authEmailEl) authEmailEl.textContent = '';
-  }
-  // restore
-  try {
-    const si = JSON.parse(localStorage.getItem('organizeMe.signedIn') || 'null');
-    if (si && si.email) setSignedIn(si.email); else setSignedOut();
-  } catch(e){ setSignedOut(); }
-
-  // Modal wiring
-  const authModal = $('auth-modal'), openSignin = $('open-signin'), openSignup = $('open-signup'),
-        closeAuth = $('close-auth') || $('close-auth'), authSubmit = $('auth-submit'), authCancel = $('auth-cancel'),
-        authTitle = $('auth-modal-title'), authEmailInput = $('auth-email-input'), authPasswordInput = $('auth-password-input');
-
-  function showAuth(mode){
-    if (!authModal) return;
-    authModal.style.display = 'block';
-    authModal.setAttribute('aria-hidden', 'false');
-    if (authTitle) authTitle.textContent = mode === 'signup' ? 'Sign up' : 'Sign in';
-    authModal.dataset.mode = mode;
-    if (authEmailInput) authEmailInput.value = '';
-    if (authPasswordInput) authPasswordInput.value = '';
-  }
-  function hideAuth(){
-    if (!authModal) return;
-    authModal.style.display = 'none';
-    authModal.setAttribute('aria-hidden', 'true');
-  }
-
-  if (openSignin) openSignin.addEventListener('click', ()=> showAuth('signin'));
-  if (openSignup) openSignup.addEventListener('click', ()=> showAuth('signup'));
-  if ($('signout-btn')) $('signout-btn').addEventListener('click', ()=> setSignedOut());
-  if ($('close-auth')) $('close-auth').addEventListener('click', hideAuth);
-  if (authCancel) authCancel.addEventListener('click', hideAuth);
-
-  if (authSubmit) authSubmit.addEventListener('click', ()=>{
-    const mode = authModal && authModal.dataset && authModal.dataset.mode ? authModal.dataset.mode : 'signin';
-    const email = authEmailInput && authEmailInput.value.trim();
-    // NOTE: this is *local-only* demo auth. To enable real auth integrate Firebase in index.js.
-    if (!email) { alert('Enter email'); return; }
-    setSignedIn(email);
-    hideAuth();
-  });
-
-  // small accessibility: close modal on overlay click
-  if (authModal) authModal.addEventListener('click', (e)=>{
-    if (e.target === authModal) hideAuth();
-  });
-
-  // expose API for external scripts (e.g. if you add Firebase index.js later)
+  // expose API
   window.OrganizeMe = {
     getTasks: () => tasks.slice(),
     replaceTasks: (arr) => { if (!Array.isArray(arr)) return; tasks = arr.map(t => ({ id: t.id||uid(), title: t.title||'', notes: t.notes||'', due: t.due||null, importance: t.importance||'Medium', done: !!t.done })); save(); render(); },
     dispatchChange
   };
-
-  // Try to load external index.js (non-blocking). If it exists, it can attach Firebase logic, override auth handlers, etc.
-  (function tryLoadExternal() {
-    try {
-      const s = document.createElement('script');
-      s.src = 'index.js';
-      s.async = true;
-      s.onload = () => console.log('External index.js loaded (if any).');
-      s.onerror = () => console.log('No external index.js found (this is fine).');
-      document.body.appendChild(s);
-    } catch(e) { console.warn('Trying to load external index.js failed', e); }
-  })();
-
 })();
 </script>
 
+<!-- Firebase-enabled module (auth + google + firestore sync) -->
 <script type="module" src="index.js" defer></script>
 
 </body>
