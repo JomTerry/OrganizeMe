@@ -7,7 +7,6 @@
 
 <link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
 <style id="fallback-style">
-  /* minimal inline fallback while style.css loads */
   :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg)}
   .wrap{max-width:980px;margin:18px auto;padding:0 16px}
@@ -46,7 +45,6 @@
       <strong>Welcome!</strong>
       <span class="meta">Sign in to sync across devices (optional).</span>
     </div>
-    <!-- status message (guest / signed-in provider message) -->
     <div id="auth-status" class="small-note meta">You are using a guest account.</div>
   </div>
 </section>
@@ -60,14 +58,25 @@
           <input id="title" placeholder="e.g. Finish report" required />
         </div>
 
-        <div class="date-time">
-          <label>Due date</label>
-          <input id="due" type="date" />
-        </div>
+        <div class="row-row">
+          <div class="date-time">
+            <label>Due date</label>
+            <input id="due" type="date" />
+          </div>
 
-        <div class="date-time">
-          <label>Due time</label>
-          <input id="time" type="time" />
+          <div class="date-time">
+            <label>Due time</label>
+            <input id="time" type="time" />
+          </div>
+
+          <div class="date-time">
+            <label>Priority</label>
+            <select id="importance">
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
         </div>
 
         <div class="actions">
@@ -109,14 +118,12 @@
   </div>
 </div>
 
-<!-- Local fallback task app (offline) -->
+<!-- Local fallback task app (offline-first, exposes window.OrganizeMe) -->
 <script>
 /*
-  Local fallback task manager.
-  Exposes window.OrganizeMe API used by index.js:
-    - getTasks()
-    - replaceTasks(array)
-    - dispatchChange()  -> fires 'OrganizeMeTasksChanged' event
+  - Tasks now include: id, title, notes, due, importance, done, createdAt, updatedAt
+  - Local modifications set updatedAt so merge can choose newest
+  - Exposes: window.OrganizeMe.getTasks(), replaceTasks(arr), dispatchChange()
 */
 (function () {
   const STORAGE_KEY = 'organizeMe.tasks.v1';
@@ -130,11 +137,9 @@
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T23:59:59');
     return new Date(s);
   }
-  function formatDueForDisplay(s) {
-    if (!s) return '';
-    if (s.includes('T')) {
-      const [d,t] = s.split('T'); return d + ' ' + t;
-    }
+  function fmtDue(s){
+    if(!s) return '';
+    if (s.includes('T')) { const [d,t] = s.split('T'); return d + ' ' + t; }
     return s;
   }
 
@@ -142,7 +147,8 @@
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
   function dispatchChange(){ window.dispatchEvent(new Event('OrganizeMeTasksChanged')); }
 
-  const title = $('title'), due = $('due'), time = $('time'), listWrap = $('list-wrap'), viewMode = $('view-mode'), showComplete = $('show-complete');
+  const title = $('title'), dueEl = $('due'), timeEl = $('time'), importanceEl = $('importance'),
+        listWrap = $('list-wrap'), viewMode = $('view-mode'), showComplete = $('show-complete');
 
   function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||2); }
   function isDueSoon(dueStr){
@@ -171,18 +177,19 @@
       if (t.done) li.classList.add('completed');
 
       const left = document.createElement('div'); left.style.display='flex'; left.style.gap='10px'; left.style.alignItems='center';
+      const badge = document.createElement('div'); badge.className = 'badge ' + (t.importance==='High' ? 'high' : t.importance==='Medium' ? 'med' : 'low'); badge.textContent = t.importance;
       const info = document.createElement('div');
       const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>' + escapeHtml(t.title) + '</strong>';
       const meta = document.createElement('div'); meta.className='meta';
-      const dueText = t.due ? 'Due ' + formatDueForDisplay(t.due) : 'No due date';
+      const dueText = t.due ? 'Due ' + fmtDue(t.due) : 'No due date';
       const soon = isDueSoon(t.due) && !t.done ? ' • <span class="soon">due soon</span>' : '';
       meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
       info.appendChild(titleEl); info.appendChild(meta);
-      left.appendChild(info);
+      left.appendChild(badge); left.appendChild(info);
 
       const ctr = document.createElement('div'); ctr.style.display='flex'; ctr.style.gap='8px';
       const doneBtn = document.createElement('button'); doneBtn.textContent = t.done ? 'Undo' : 'Done';
-      doneBtn.onclick = ()=>{ t.done = !t.done; save(); render(); };
+      doneBtn.onclick = ()=>{ t.done = !t.done; t.updatedAt = new Date().toISOString(); save(); render(); };
       const editBtn = document.createElement('button'); editBtn.className='ghost'; editBtn.textContent='Edit';
       editBtn.onclick = ()=> openEdit(t);
       const delBtn = document.createElement('button'); delBtn.className='ghost'; delBtn.textContent='Delete';
@@ -197,17 +204,20 @@
     listWrap.innerHTML=''; listWrap.appendChild(ul);
   }
 
+  // Add / edit / clear
   function addTask(){
     const tTitle = title && title.value.trim();
-    const d = due && due.value ? due.value : null;
-    const tm = time && time.value ? time.value : null;
+    const d = dueEl && dueEl.value ? dueEl.value : null;
+    const tm = timeEl && timeEl.value ? timeEl.value : null;
+    const imp = importanceEl && importanceEl.value ? importanceEl.value : 'Medium';
     let dueStr = null;
     if (d && tm) dueStr = d + 'T' + tm;
     else if (d) dueStr = d;
-    const t = { id: uid(), title: tTitle, notes: '', due: dueStr, importance: 'Medium', done: false, createdAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const t = { id: uid(), title: tTitle, notes: '', due: dueStr, importance: imp, done: false, createdAt: now, updatedAt: now };
     if (!t.title) return alert('Give the task a name.');
     tasks.push(t); save(); render();
-    if (title) title.value=''; if (due) due.value=''; if (time) time.value='';
+    if (title) title.value=''; if (dueEl) dueEl.value=''; if (timeEl) timeEl.value=''; if (importanceEl) importanceEl.value='Medium';
   }
 
   function openEdit(task){
@@ -216,8 +226,11 @@
     task.title = newTitle.trim() || task.title;
     const newNotes = prompt('Edit notes', task.notes||'');
     if (newNotes !== null) task.notes = newNotes.trim();
-    const newDue = prompt('Due (YYYY-MM-DD) or blank', task.due||'');
+    const newDue = prompt('Due (YYYY-MM-DD or YYYY-MM-DDTHH:MM) or blank', task.due||'');
     if (newDue !== null) task.due = newDue.trim() || null;
+    const newImp = prompt('Priority (High / Medium / Low)', task.importance || 'Medium');
+    if (newImp !== null && ['High','Medium','Low'].includes(newImp)) task.importance = newImp;
+    task.updatedAt = new Date().toISOString();
     save(); render();
   }
 
@@ -236,7 +249,21 @@
   // expose API
   window.OrganizeMe = {
     getTasks: () => tasks.slice(),
-    replaceTasks: (arr) => { if (!Array.isArray(arr)) return; tasks = arr.map(t => ({ id: t.id||uid(), title: t.title||'', notes: t.notes||'', due: t.due||null, importance: t.importance||'Medium', done: !!t.done })); save(); render(); },
+    replaceTasks: (arr) => {
+      if (!Array.isArray(arr)) return;
+      // ensure tasks have required fields
+      tasks = arr.map(t => ({
+        id: t.id || uid(),
+        title: t.title || '',
+        notes: t.notes || '',
+        due: t.due || null,
+        importance: t.importance || 'Medium',
+        done: !!t.done,
+        createdAt: t.createdAt || (new Date().toISOString()),
+        updatedAt: t.updatedAt || (new Date().toISOString())
+      }));
+      save(); render();
+    },
     dispatchChange
   };
 })();
