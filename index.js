@@ -1,4 +1,5 @@
-// index.js — robust Firebase Google sign-in with popup -> redirect fallback
+// index.js — Firestore realtime sync + merge + auth
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4",
   authDomain: "jomterryy417-c0c.firebaseapp.com",
@@ -11,41 +12,41 @@ const FIREBASE_CONFIG = {
 const $ = id => document.getElementById(id);
 function L(...args){ console.debug('[OrganizeMe]', ...args); }
 
-// IMPORTANT: remove the demo local-only sign-in marker so UI won't show a false "signed in" state
-try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
-
-/* Wrap in IIFE so we can use await at top-level */
-(async function main() {
+(async function init() {
   try {
     const [fbAppMod, fbAuthMod, fbFsMod] = await Promise.all([
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
     ]);
+
     const { initializeApp } = fbAppMod;
     const {
-      getAuth,
-      onAuthStateChanged,
-      signInWithPopup,
-      signInWithRedirect,
-      getRedirectResult,
-      GoogleAuthProvider,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
-      signOut
+      getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult,
+      GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
     } = fbAuthMod;
-    const { getFirestore, doc, getDoc, setDoc } = fbFsMod;
+    const { getFirestore, doc, getDoc, setDoc, onSnapshot } = fbFsMod;
 
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
     const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
 
     const statusEl = $('auth-status');
 
-    function showSignedInUI(email, providerId) {
-      $('signed-in-row') && ($('signed-in-row').style.display = 'flex');
-      $('signed-out-row') && ($('signed-out-row').style.display = 'none');
+    function tasksEqual(a,b){
+      try {
+        if (!Array.isArray(a) || !Array.isArray(b)) return false;
+        // compare by JSON of sorted ids (cheap)
+        const fa = JSON.stringify(a.slice().sort((x,y)=> (x.id||'').localeCompare(y.id||'')));
+        const fb = JSON.stringify(b.slice().sort((x,y)=> (x.id||'').localeCompare(y.id||'')));
+        return fa === fb;
+      } catch(e){ return false; }
+    }
+
+    function showSignedInUI(email, providerId){
+      $('signed-in-row') && ($('signed-in-row').style.display='flex');
+      $('signed-out-row') && ($('signed-out-row').style.display='none');
       if ($('auth-email')) $('auth-email').textContent = email || '';
       if (statusEl) {
         if (providerId && providerId.includes('google')) statusEl.textContent = `Signed in with Google (${email || ''})`;
@@ -53,23 +54,26 @@ try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
       }
       try { localStorage.removeItem('organizeMe.signedIn'); } catch(_) {}
     }
-    function showSignedOutUI() {
-      $('signed-in-row') && ($('signed-in-row').style.display = 'none');
-      $('signed-out-row') && ($('signed-out-row').style.display = 'flex');
+    function showSignedOutUI(){
+      $('signed-in-row') && ($('signed-in-row').style.display='none');
+      $('signed-out-row') && ($('signed-out-row').style.display='flex');
       if ($('auth-email')) $('auth-email').textContent = '';
       if (statusEl) statusEl.textContent = 'You are using a guest account.';
     }
 
-    // Firestore sync helpers (same idea as before)
+    // Firestore helpers
     async function pushLocalToRemote(uid){
       if (!window.OrganizeMe || typeof window.OrganizeMe.getTasks !== 'function') { L('no local API to push'); return; }
       try {
         const tasks = window.OrganizeMe.getTasks() || [];
+        // ensure each item has updatedAt
+        tasks.forEach(t => { if (!t.updatedAt) t.updatedAt = new Date().toISOString(); if (!t.createdAt) t.createdAt = new Date().toISOString(); });
         const ref = doc(db, 'users', uid);
         await setDoc(ref, { tasks }, { merge: true });
         L('pushed tasks to Firestore', tasks.length);
-      } catch (e){ console.warn('pushLocalToRemote failed', e); }
+      } catch (e) { console.warn('pushLocalToRemote failed', e); }
     }
+
     async function pullRemoteToLocal(uid){
       if (!window.OrganizeMe || typeof window.OrganizeMe.replaceTasks !== 'function') { L('no local API to pull to'); return; }
       try {
@@ -78,68 +82,116 @@ try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
         if (snap.exists()) {
           const data = snap.data() || {};
           const remoteTasks = Array.isArray(data.tasks) ? data.tasks : [];
-          window.OrganizeMe.replaceTasks(remoteTasks);
-          L('pulled remote tasks into local', remoteTasks.length);
+          mergeRemoteIntoLocal(remoteTasks);
+          L('pulled remote tasks', remoteTasks.length);
         } else {
-          // Initialize remote with local
+          // initialize remote with local
           await pushLocalToRemote(uid);
           L('no remote doc; uploaded local');
         }
-      } catch (e){ console.warn('pullRemoteToLocal failed', e); }
+      } catch(e){ console.warn('pullRemoteToLocal failed', e); }
     }
 
-    // debounce sync
-    let syncTimer = null;
+    // Merge strategy: keep newest by updatedAt for tasks with same id; add missing tasks.
+    function mergeRemoteIntoLocal(remoteTasks){
+      if (!window.OrganizeMe || typeof window.OrganizeMe.getTasks !== 'function') return;
+      const local = window.OrganizeMe.getTasks() || [];
+      // map local by id
+      const map = new Map();
+      local.forEach(t => map.set(t.id, Object.assign({}, t)));
+      // merge remote
+      (remoteTasks || []).forEach(rt => {
+        if (!rt || !rt.id) return;
+        const localItem = map.get(rt.id);
+        // normalize timestamps
+        const rUpdated = rt.updatedAt || rt.createdAt || 0;
+        if (!localItem) {
+          map.set(rt.id, Object.assign({}, rt));
+        } else {
+          const lUpdated = localItem.updatedAt || localItem.createdAt || 0;
+          // prefer the newer one
+          if (new Date(rUpdated) > new Date(lUpdated)) {
+            map.set(rt.id, Object.assign({}, rt));
+          } // else keep local
+        }
+      });
+      // also keep any local-only items (already in map)
+      const merged = Array.from(map.values());
+      // If merged equals current local, skip to avoid loops
+      if (tasksEqual(merged, local)) { L('merged == local; skip replace'); return; }
+      window.OrganizeMe.replaceTasks(merged);
+      L('mergeRemoteIntoLocal completed, merged count', merged.length);
+    }
+
+    // Debounced sync handler for local changes
+    let syncHandler = null;
     function createSyncHandler(uid){
       return () => {
-        if (syncTimer) clearTimeout(syncTimer);
-        syncTimer = setTimeout(()=> pushLocalToRemote(uid), 700);
+        if (syncHandler) clearTimeout(syncHandler);
+        syncHandler = setTimeout(()=> pushLocalToRemote(uid), 700);
       };
     }
 
-    // Auth state handling
-    let currentSyncHandler = null;
+    // Real-time listener unsub
+    let unsubscribeUserDoc = null;
+    let currentLocalSyncHandler = null;
+
+    // Auth state listener: attach onSnapshot on sign-in, detach on sign-out
     onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
-          // provider detection
           const pids = (user.providerData || []).map(pd => pd.providerId || '');
           const usedGoogle = pids.includes('google.com');
-          showSignedInUI(user.email || user.displayName, usedGoogle ? 'google' : pids[0] || '');
-          // sync remote -> local then watch local changes
-          await pullRemoteToLocal(user.uid);
-          currentSyncHandler = createSyncHandler(user.uid);
-          window.addEventListener('OrganizeMeTasksChanged', currentSyncHandler);
-          L('onAuthStateChanged: signed in', user.uid, pids);
+          showSignedInUI(user.email || user.displayName, usedGoogle ? 'google' : (pids[0] || ''));
+          const uid = user.uid;
+          // initial pull & then subscribe
+          await pullRemoteToLocal(uid);
+          // attach realtime listener
+          const ref = doc(db, 'users', uid);
+          if (unsubscribeUserDoc) unsubscribeUserDoc();
+          unsubscribeUserDoc = onSnapshot(ref, (snap) => {
+            if (!snap.exists()) {
+              L('snapshot: no doc');
+              return;
+            }
+            const data = snap.data() || {};
+            const remoteTasks = Array.isArray(data.tasks) ? data.tasks : [];
+            // if remote equals local, skip
+            const local = (window.OrganizeMe && window.OrganizeMe.getTasks) ? window.OrganizeMe.getTasks() : [];
+            if (tasksEqual(remoteTasks, local)) {
+              L('snapshot: remote == local; nothing to do');
+              return;
+            }
+            L('snapshot: remote changed; merging into local');
+            mergeRemoteIntoLocal(remoteTasks);
+          }, (err) => {
+            console.warn('onSnapshot error', err);
+          });
+          // set up local->remote watcher
+          if (currentLocalSyncHandler) {
+            window.removeEventListener('OrganizeMeTasksChanged', currentLocalSyncHandler);
+            currentLocalSyncHandler = null;
+          }
+          currentLocalSyncHandler = createSyncHandler(uid);
+          window.addEventListener('OrganizeMeTasksChanged', currentLocalSyncHandler);
         } else {
           showSignedOutUI();
-          if (currentSyncHandler) {
-            window.removeEventListener('OrganizeMeTasksChanged', currentSyncHandler);
-            currentSyncHandler = null;
-          }
-          L('onAuthStateChanged: signed out');
+          if (unsubscribeUserDoc) { unsubscribeUserDoc(); unsubscribeUserDoc = null; }
+          if (currentLocalSyncHandler) { window.removeEventListener('OrganizeMeTasksChanged', currentLocalSyncHandler); currentLocalSyncHandler = null; }
         }
       } catch(err){ console.error('onAuthStateChanged error', err); }
     });
 
-    // Handle redirect result on load (if we previously used signInWithRedirect)
+    // handle redirect result (in case of signInWithRedirect)
     try {
-      const redirectResult = await getRedirectResult(auth);
-      if (redirectResult && redirectResult.user) {
-        L('getRedirectResult: completed redirect sign-in', redirectResult.user.uid);
-        // onAuthStateChanged will run and sync/pull
-      } else {
-        L('getRedirectResult: no redirect result');
+      const { getRedirectResult } = fbAuthMod;
+      if (typeof getRedirectResult === 'function') {
+        const res = await getRedirectResult(auth);
+        if (res && res.user) L('redirect result user', res.user.uid);
       }
-    } catch (err){
-      // detect unauthorized domain early
-      L('getRedirectResult error', err && err.code, err && err.message);
-      if (err && err.code === 'auth/unauthorized-domain') {
-        alert('Firebase: unauthorized domain. Add your site origin to Firebase Authorized domains (Auth → Sign-in method).');
-      }
-    }
+    } catch(e){ L('getRedirectResult failed', e); }
 
-    // Wire modal auth (email/password) to Firebase
+    // Auth UI wiring (modal)
     const openSignin = $('open-signin'), openSignup = $('open-signup');
     const authModal = $('auth-modal'), authTitle = $('auth-modal-title'), authEmailInput = $('auth-email-input'), authPasswordInput = $('auth-password-input'), authSubmit = $('auth-submit'), authCancel = $('auth-cancel'), closeAuth = $('close-auth');
 
@@ -157,7 +209,7 @@ try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
     openSignup?.addEventListener('click', ()=> showAuth('signup'));
     authCancel?.addEventListener('click', hideAuth);
     closeAuth?.addEventListener('click', hideAuth);
-    authModal?.addEventListener('click', e => { if (e.target === authModal) hideAuth(); });
+    authModal?.addEventListener('click', (e)=> { if (e.target === authModal) hideAuth(); });
 
     authSubmit?.addEventListener('click', async () => {
       const mode = authModal && authModal.dataset && authModal.dataset.mode ? authModal.dataset.mode : 'signin';
@@ -165,50 +217,30 @@ try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
       const pw = authPasswordInput && authPasswordInput.value;
       if (!em || !pw) { alert('Enter email and password'); return; }
       try {
-        if (mode === 'signup') {
-          await createUserWithEmailAndPassword(auth, em, pw);
-        } else {
-          await signInWithEmailAndPassword(auth, em, pw);
-        }
+        if (mode === 'signup') await createUserWithEmailAndPassword(auth, em, pw);
+        else await signInWithEmailAndPassword(auth, em, pw);
         hideAuth();
-      } catch (err) {
-        console.error('email auth error', err);
-        alert(err.message || 'Authentication failed');
-      }
+      } catch (err) { console.error('email auth error', err); alert(err.message || 'Auth failed'); }
     });
 
-    // Google sign-in: try popup, fallback to redirect on known failures
+    // Google sign-in (popup -> fallback redirect)
     $('google-login')?.addEventListener('click', async () => {
       try {
-        L('attempting signInWithPopup');
+        L('signInWithPopup attempt');
         await signInWithPopup(auth, provider);
-        L('signInWithPopup resolved (popup success)');
-        // onAuthStateChanged will handle UI
       } catch (err) {
-        L('signInWithPopup error', err && err.code, err && err.message);
-        // Common fallback cases:
-        // - auth/popup-blocked
-        // - auth/operation-not-supported-in-this-environment (embedded webviews)
-        // - auth/cancelled-popup-request (race)
-        // - auth/unauthorized-domain
+        L('signInWithPopup error', err && err.code);
         if (err && err.code === 'auth/unauthorized-domain') {
-          alert('Firebase error: unauthorized domain. Add your site origin to Firebase Authorized domains (Auth → Sign-in method).');
+          alert('Firebase: unauthorized domain. Add your origin to Authorized domains (Auth → Sign-in method).');
           return;
         }
-        // If popup blocked or environment doesn't support popup, fall back to redirect
-        if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment' || err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user')) {
-          try {
-            L('falling back to signInWithRedirect');
-            await signInWithRedirect(auth, provider);
-            // The browser will navigate away to Google and then to the firebase handler/redirectUri.
-            // After redirect back, the getRedirectResult() above will complete (and onAuthStateChanged will run).
-          } catch (e2) {
-            console.error('signInWithRedirect failed', e2);
-            alert(e2.message || 'Redirect sign-in failed');
-          }
-        } else {
-          // unknown error — show message
-          alert(err && err.message ? err.message : 'Google sign-in failed');
+        // fallback to redirect
+        try {
+          L('falling back to signInWithRedirect');
+          await signInWithRedirect(auth, provider);
+        } catch (e) {
+          console.error('signInWithRedirect failed', e);
+          alert(e.message || 'Google sign-in failed');
         }
       }
     });
@@ -218,15 +250,12 @@ try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
       try {
         await signOut(auth);
         L('signed out');
-      } catch (e) {
-        console.error('signOut failed', e); alert('Sign out failed: ' + (e && e.message || e));
-      }
+      } catch (e) { console.error('signOut failed', e); alert('Sign out failed'); }
     });
 
-    L('index.js initialized — Firebase auth ready');
+    L('index.js: initialized and ready');
   } catch (err) {
-    console.warn('Firebase imports or init failed', err);
-    // If Firebase is offline/unavailable, show guest text
+    console.warn('Firebase init/import failed (index.js). Remote features disabled.', err);
     const statusEl = $('auth-status');
     if (statusEl) statusEl.textContent = 'You are using a guest account (Firebase unavailable).';
   }
