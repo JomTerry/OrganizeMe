@@ -1,6 +1,4 @@
-// index.js (ES module) — Firebase Auth + Google + Firestore sync
-// Uses modular Firebase from CDN. Make sure this file sits next to index.html.
-
+// index.js — robust Firebase Google sign-in with popup -> redirect fallback
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4",
   authDomain: "jomterryy417-c0c.firebaseapp.com",
@@ -11,29 +9,40 @@ const FIREBASE_CONFIG = {
 };
 
 const $ = id => document.getElementById(id);
-function log(...args){ console.debug('[OrganizeMe]', ...args); }
+function L(...args){ console.debug('[OrganizeMe]', ...args); }
 
-(async function init() {
+// IMPORTANT: remove the demo local-only sign-in marker so UI won't show a false "signed in" state
+try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
+
+/* Wrap in IIFE so we can use await at top-level */
+(async function main() {
   try {
-    // dynamic imports
     const [fbAppMod, fbAuthMod, fbFsMod] = await Promise.all([
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
     ]);
-
     const { initializeApp } = fbAppMod;
-    const { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } = fbAuthMod;
+    const {
+      getAuth,
+      onAuthStateChanged,
+      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
+      GoogleAuthProvider,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut
+    } = fbAuthMod;
     const { getFirestore, doc, getDoc, setDoc } = fbFsMod;
 
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
-    const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
+    const db = getFirestore(app);
 
     const statusEl = $('auth-status');
 
-    // UI toggles
     function showSignedInUI(email, providerId) {
       $('signed-in-row') && ($('signed-in-row').style.display = 'flex');
       $('signed-out-row') && ($('signed-out-row').style.display = 'none');
@@ -51,18 +60,18 @@ function log(...args){ console.debug('[OrganizeMe]', ...args); }
       if (statusEl) statusEl.textContent = 'You are using a guest account.';
     }
 
-    // Firestore helpers
-    async function pushLocalToRemote(uid) {
-      if (!window.OrganizeMe || typeof window.OrganizeMe.getTasks !== 'function') { log('No local API to push'); return; }
+    // Firestore sync helpers (same idea as before)
+    async function pushLocalToRemote(uid){
+      if (!window.OrganizeMe || typeof window.OrganizeMe.getTasks !== 'function') { L('no local API to push'); return; }
       try {
         const tasks = window.OrganizeMe.getTasks() || [];
         const ref = doc(db, 'users', uid);
         await setDoc(ref, { tasks }, { merge: true });
-        log('pushed tasks', tasks.length);
-      } catch (e) { console.warn('pushLocalToRemote failed', e); }
+        L('pushed tasks to Firestore', tasks.length);
+      } catch (e){ console.warn('pushLocalToRemote failed', e); }
     }
-    async function pullRemoteToLocal(uid) {
-      if (!window.OrganizeMe || typeof window.OrganizeMe.replaceTasks !== 'function') { log('No local API to pull to'); return; }
+    async function pullRemoteToLocal(uid){
+      if (!window.OrganizeMe || typeof window.OrganizeMe.replaceTasks !== 'function') { L('no local API to pull to'); return; }
       try {
         const ref = doc(db, 'users', uid);
         const snap = await getDoc(ref);
@@ -70,49 +79,71 @@ function log(...args){ console.debug('[OrganizeMe]', ...args); }
           const data = snap.data() || {};
           const remoteTasks = Array.isArray(data.tasks) ? data.tasks : [];
           window.OrganizeMe.replaceTasks(remoteTasks);
-          log('pulled remote tasks', remoteTasks.length);
+          L('pulled remote tasks into local', remoteTasks.length);
         } else {
+          // Initialize remote with local
           await pushLocalToRemote(uid);
-          log('no remote doc; uploaded local');
+          L('no remote doc; uploaded local');
         }
-      } catch (e) { console.warn('pullRemoteToLocal failed', e); }
+      } catch (e){ console.warn('pullRemoteToLocal failed', e); }
     }
 
-    // Debounced sync
+    // debounce sync
     let syncTimer = null;
-    function createSyncHandler(uid) {
+    function createSyncHandler(uid){
       return () => {
         if (syncTimer) clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => pushLocalToRemote(uid), 800);
+        syncTimer = setTimeout(()=> pushLocalToRemote(uid), 700);
       };
     }
 
-    // Auth state listener
+    // Auth state handling
     let currentSyncHandler = null;
     onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
+          // provider detection
           const pids = (user.providerData || []).map(pd => pd.providerId || '');
           const usedGoogle = pids.includes('google.com');
-          showSignedInUI(user.email || user.displayName, usedGoogle ? 'google' : (pids[0] || ''));
+          showSignedInUI(user.email || user.displayName, usedGoogle ? 'google' : pids[0] || '');
+          // sync remote -> local then watch local changes
           await pullRemoteToLocal(user.uid);
           currentSyncHandler = createSyncHandler(user.uid);
           window.addEventListener('OrganizeMeTasksChanged', currentSyncHandler);
+          L('onAuthStateChanged: signed in', user.uid, pids);
         } else {
           showSignedOutUI();
           if (currentSyncHandler) {
             window.removeEventListener('OrganizeMeTasksChanged', currentSyncHandler);
             currentSyncHandler = null;
           }
+          L('onAuthStateChanged: signed out');
         }
-      } catch (err) { console.error('onAuthStateChanged error', err); }
+      } catch(err){ console.error('onAuthStateChanged error', err); }
     });
 
-    // Modal and auth UI wiring (email/password)
+    // Handle redirect result on load (if we previously used signInWithRedirect)
+    try {
+      const redirectResult = await getRedirectResult(auth);
+      if (redirectResult && redirectResult.user) {
+        L('getRedirectResult: completed redirect sign-in', redirectResult.user.uid);
+        // onAuthStateChanged will run and sync/pull
+      } else {
+        L('getRedirectResult: no redirect result');
+      }
+    } catch (err){
+      // detect unauthorized domain early
+      L('getRedirectResult error', err && err.code, err && err.message);
+      if (err && err.code === 'auth/unauthorized-domain') {
+        alert('Firebase: unauthorized domain. Add your site origin to Firebase Authorized domains (Auth → Sign-in method).');
+      }
+    }
+
+    // Wire modal auth (email/password) to Firebase
     const openSignin = $('open-signin'), openSignup = $('open-signup');
     const authModal = $('auth-modal'), authTitle = $('auth-modal-title'), authEmailInput = $('auth-email-input'), authPasswordInput = $('auth-password-input'), authSubmit = $('auth-submit'), authCancel = $('auth-cancel'), closeAuth = $('close-auth');
 
-    function showAuth(mode) {
+    function showAuth(mode){
       if (!authModal) return;
       authModal.style.display = 'block'; authModal.setAttribute('aria-hidden','false');
       authModal.dataset.mode = mode;
@@ -120,13 +151,13 @@ function log(...args){ console.debug('[OrganizeMe]', ...args); }
       if (authEmailInput) authEmailInput.value = '';
       if (authPasswordInput) authPasswordInput.value = '';
     }
-    function hideAuth() { if (!authModal) return; authModal.style.display = 'none'; authModal.setAttribute('aria-hidden','true'); }
+    function hideAuth(){ if (!authModal) return; authModal.style.display = 'none'; authModal.setAttribute('aria-hidden','true'); }
 
     openSignin?.addEventListener('click', ()=> showAuth('signin'));
     openSignup?.addEventListener('click', ()=> showAuth('signup'));
     authCancel?.addEventListener('click', hideAuth);
     closeAuth?.addEventListener('click', hideAuth);
-    authModal?.addEventListener('click', (e)=> { if (e.target === authModal) hideAuth(); });
+    authModal?.addEventListener('click', e => { if (e.target === authModal) hideAuth(); });
 
     authSubmit?.addEventListener('click', async () => {
       const mode = authModal && authModal.dataset && authModal.dataset.mode ? authModal.dataset.mode : 'signin';
@@ -140,29 +171,63 @@ function log(...args){ console.debug('[OrganizeMe]', ...args); }
           await signInWithEmailAndPassword(auth, em, pw);
         }
         hideAuth();
-      } catch (err) { console.error('auth error', err); alert(err.message || 'Auth failed'); }
+      } catch (err) {
+        console.error('email auth error', err);
+        alert(err.message || 'Authentication failed');
+      }
     });
 
-    // Google sign-in button
+    // Google sign-in: try popup, fallback to redirect on known failures
     $('google-login')?.addEventListener('click', async () => {
       try {
+        L('attempting signInWithPopup');
         await signInWithPopup(auth, provider);
-        // onAuthStateChanged handles the rest
+        L('signInWithPopup resolved (popup success)');
+        // onAuthStateChanged will handle UI
       } catch (err) {
-        console.error('Google sign-in error', err);
-        alert(err.message || 'Google sign-in failed');
+        L('signInWithPopup error', err && err.code, err && err.message);
+        // Common fallback cases:
+        // - auth/popup-blocked
+        // - auth/operation-not-supported-in-this-environment (embedded webviews)
+        // - auth/cancelled-popup-request (race)
+        // - auth/unauthorized-domain
+        if (err && err.code === 'auth/unauthorized-domain') {
+          alert('Firebase error: unauthorized domain. Add your site origin to Firebase Authorized domains (Auth → Sign-in method).');
+          return;
+        }
+        // If popup blocked or environment doesn't support popup, fall back to redirect
+        if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment' || err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user')) {
+          try {
+            L('falling back to signInWithRedirect');
+            await signInWithRedirect(auth, provider);
+            // The browser will navigate away to Google and then to the firebase handler/redirectUri.
+            // After redirect back, the getRedirectResult() above will complete (and onAuthStateChanged will run).
+          } catch (e2) {
+            console.error('signInWithRedirect failed', e2);
+            alert(e2.message || 'Redirect sign-in failed');
+          }
+        } else {
+          // unknown error — show message
+          alert(err && err.message ? err.message : 'Google sign-in failed');
+        }
       }
     });
 
     // Sign out
     $('signout-btn')?.addEventListener('click', async () => {
-      try { await signOut(auth); } catch (e) { console.error('signout failed', e); alert('Sign out failed'); }
+      try {
+        await signOut(auth);
+        L('signed out');
+      } catch (e) {
+        console.error('signOut failed', e); alert('Sign out failed: ' + (e && e.message || e));
+      }
     });
 
-    log('Firebase auth module loaded');
+    L('index.js initialized — Firebase auth ready');
   } catch (err) {
-    console.warn('Firebase module load failed (index.js). Remote features disabled.', err);
+    console.warn('Firebase imports or init failed', err);
+    // If Firebase is offline/unavailable, show guest text
     const statusEl = $('auth-status');
-    if (statusEl) statusEl.textContent = 'You are using a guest account (offline / Firebase unavailable).';
+    if (statusEl) statusEl.textContent = 'You are using a guest account (Firebase unavailable).';
   }
 })();
