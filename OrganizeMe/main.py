@@ -20,7 +20,7 @@ class WebViewApp(App):
             webview.setWebViewClient(WebViewClient())
 
             # Load local HTML file from assets
-            webview.loadUrl("file:///android_asset/index.html")
+            webview.loadUrl("https://jomterryy417-c0c.web.app/")
 
             activity.setContentView(webview)
             return Label(text="")  # Kivy needs to return a widget
