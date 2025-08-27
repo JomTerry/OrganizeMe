@@ -99,8 +99,20 @@ const verifiedWarning = $('verified-warning');
 
 /* ========== Storage functions ========== */
 function loadLocal(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
-function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
-function dispatchChange(){ window.dispatchEvent(new Event('OrganizeMeTasksChanged')); if(currentUser && currentUser.emailVerified){ if(syncTimeout) clearTimeout(syncTimeout); syncTimeout = setTimeout(pushTasksToRemote, 900); } else saveLocal(); }
+function saveLocal(){ 
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); 
+}
+
+function dispatchChange() {
+  window.dispatchEvent(new Event('OrganizeMeTasksChanged'));
+
+  if (currentUser && currentUser.emailVerified) {
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(pushTasksToRemote, 900);
+  } else {
+    saveLocal();
+  }
+}
 
 /* ========== Render logic ========== */
 function render(){
