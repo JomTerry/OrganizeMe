@@ -13,10 +13,25 @@
         <h1 class="site-title">OrganizeMe</h1>
         <div class="site-sub">Task manager — sync across devices</div>
       </div>
+
       <div class="auth-area">
-        <div id="guest-note" class="meta small">Guest account</div>
-        <div id="user-email" class="meta small" style="display:none"></div>
-        <button id="sign-btn" class="btn ghost">Sign in</button>
+        <div class="auth-info">
+          <div id="guest-note" class="meta small">Guest account</div>
+          <div id="user-email" class="meta small" style="display:none"></div>
+        </div>
+
+        <div id="auth-buttons" class="auth-buttons">
+          <button id="google-signin" class="btn google-btn" title="Sign in with Google">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" /> Continue with Google
+          </button>
+
+          <div class="email-actions">
+            <button id="email-signin" class="btn ghost">Sign in (email)</button>
+            <button id="email-signup" class="btn ghost">Sign up (email)</button>
+          </div>
+        </div>
+
+        <button id="account-btn" class="btn ghost" style="display:none">Profile</button>
       </div>
     </div>
   </header>
@@ -41,17 +56,17 @@
       </div>
 
       <div id="sections">
-        <div class="section">
+        <div class="section card-section">
           <h3 class="section-title">High Priority</h3>
           <div id="high-list" class="task-list"></div>
         </div>
 
-        <div class="section">
+        <div class="section card-section">
           <h3 class="section-title">Medium Priority</h3>
           <div id="med-list" class="task-list"></div>
         </div>
 
-        <div class="section">
+        <div class="section card-section">
           <h3 class="section-title">Low Priority</h3>
           <div id="low-list" class="task-list"></div>
         </div>
@@ -98,28 +113,70 @@
 
     <!-- Profile -->
     <section id="page-profile" class="page" style="display:none">
-      <div class="card profile-card">
-        <h2>Profile</h2>
-        <div class="profile-row">
-          <div class="avatar">👤</div>
-          <div>
-            <div id="profile-email" class="strong"></div>
-            <div id="profile-uid" class="meta"></div>
-            <div style="margin-top:8px">
-              <label>Display name (what others see)
-                <input id="profile-name-input" placeholder="Your name" />
-              </label>
-              <div style="display:flex;gap:8px;margin-top:8px">
-                <button id="save-name-btn" class="btn">Save name</button>
-                <button id="refresh-profile" class="btn ghost">Reload profile</button>
+      <div class="card profile-card" id="profile-card">
+
+        <!-- If signed in: show profile editor -->
+        <div id="profile-signedin" style="display:none">
+          <h2>Profile</h2>
+          <div class="profile-row">
+            <div class="avatar">👤</div>
+            <div>
+              <div id="profile-email" class="strong"></div>
+              <div id="profile-uid" class="meta"></div>
+              <div style="margin-top:8px">
+                <label>Display name
+                  <input id="profile-name-input" placeholder="Your name" />
+                </label>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <button id="save-name-btn" class="btn">Save name</button>
+                  <button id="refresh-profile" class="btn ghost">Reload profile</button>
+                </div>
+                <div id="profile-save-status" class="meta" style="margin-top:6px"></div>
               </div>
-              <div id="profile-save-status" class="meta" style="margin-top:6px"></div>
             </div>
           </div>
+
+          <div id="verified-warning" class="meta" style="margin-top:10px;color:#a00;display:none"></div>
+
+          <div style="margin-top:12px">
+            <button id="signout-btn" class="btn">Sign out</button>
+            <button id="clear-local" class="btn ghost">Clear local tasks</button>
+          </div>
         </div>
-        <div style="margin-top:12px">
-          <button id="signout-btn" class="btn">Sign out</button>
-          <button id="clear-local" class="btn ghost">Clear local tasks</button>
+
+        <!-- If NOT signed in: show email sign-in/sign-up forms -->
+        <div id="profile-signedout" style="display:none">
+          <h2>Sign in or Create an account</h2>
+
+          <div class="auth-forms">
+            <div class="card" style="margin-bottom:12px">
+              <h3>Sign in (email)</h3>
+              <form id="form-signin" onsubmit="return false;">
+                <input id="signin-email" type="email" placeholder="Email" required />
+                <input id="signin-password" type="password" placeholder="Password" required />
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <button id="signin-submit" class="btn">Sign in</button>
+                  <button id="signin-cancel" class="btn ghost">Cancel</button>
+                </div>
+                <div id="signin-status" class="meta" style="margin-top:8px"></div>
+              </form>
+            </div>
+
+            <div class="card">
+              <h3>Create account (email)</h3>
+              <form id="form-signup" onsubmit="return false;">
+                <input id="signup-email" type="email" placeholder="Email" required />
+                <input id="signup-password" type="password" placeholder="Password (min 6)" minlength="6" required />
+                <input id="signup-confirm" type="password" placeholder="Confirm password" minlength="6" required />
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <button id="signup-submit" class="btn">Create account</button>
+                  <button id="signup-cancel" class="btn ghost">Cancel</button>
+                </div>
+                <div id="signup-status" class="meta" style="margin-top:8px"></div>
+              </form>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -144,6 +201,9 @@
       </div>
     </div>
   </template>
+
+  <!-- tiny toast container -->
+  <div id="toast" class="toast" aria-live="polite" style="display:none"></div>
 
   <script type="module" src="index.js" defer></script>
 </body>
