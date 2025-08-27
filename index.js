@@ -132,7 +132,7 @@ function render(){
       if(t.duration) metaParts.push(`${t.duration} h`);
       node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
       const doneBtn = node.querySelector('.done-btn');
-      doneBtn.textContent = t.done ? 'Undo' : 'Mark';
+      doneBtn.textContent = t.done ? 'Undo' : 'Done';
       doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
       node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
       node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
