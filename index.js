@@ -6,8 +6,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 import {
@@ -71,6 +70,10 @@ const backHomeBtn = document.getElementById('back-home');
 
 const profileEmail = document.getElementById('profile-email');
 const profileUid = document.getElementById('profile-uid');
+const profileNameInput = document.getElementById('profile-name-input');
+const saveNameBtn = document.getElementById('save-name-btn');
+const refreshProfileBtn = document.getElementById('refresh-profile');
+const profileSaveStatus = document.getElementById('profile-save-status');
 const signoutBtn = document.getElementById('signout-btn');
 const clearLocalBtn = document.getElementById('clear-local');
 
@@ -103,23 +106,43 @@ function render(){
   }
   const dueSoon = visible.filter(t => { if(!t.due) return false; const d = parseDueToDate(t.due); const diff = d.getTime() - Date.now(); return diff > 0 && diff <= 1000*60*60*24*2 && !t.done; }).length;
   todayCount.textContent = `You have ${dueSoon} tasks due soon`;
-  highList.innerHTML=''; medList.innerHTML=''; lowList.innerHTML='';
-  visible.forEach(t => {
-    const node = taskTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector('.task-title').textContent = t.title;
-    const metaParts = [];
-    if(t.due) metaParts.push(formatDueForDisplay(t.due));
-    if(t.duration) metaParts.push(`${t.duration} h`);
-    node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
-    const doneBtn = node.querySelector('.done-btn');
-    doneBtn.textContent = t.done ? 'Undo' : 'Mark';
-    doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
-    node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
-    node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
-    if(t.priority === 'High') highList.appendChild(node);
-    else if(t.priority === 'Medium') medList.appendChild(node);
-    else lowList.appendChild(node);
-  });
+
+  // Clear lists then fill; if empty show "No tasks yet!"
+  highList.innerHTML = '';
+  medList.innerHTML = '';
+  lowList.innerHTML = '';
+
+  const high = visible.filter(t => t.priority === 'High');
+  const med = visible.filter(t => t.priority === 'Medium');
+  const low = visible.filter(t => t.priority === 'Low');
+
+  function appendTasksTo(container, arr){
+    if(!arr.length){
+      const e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = 'No tasks yet!';
+      container.appendChild(e);
+      return;
+    }
+    arr.forEach(t => {
+      const node = taskTemplate.content.firstElementChild.cloneNode(true);
+      node.querySelector('.task-title').textContent = t.title;
+      const metaParts = [];
+      if(t.due) metaParts.push(formatDueForDisplay(t.due));
+      if(t.duration) metaParts.push(`${t.duration} h`);
+      node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
+      const doneBtn = node.querySelector('.done-btn');
+      doneBtn.textContent = t.done ? 'Undo' : 'Mark';
+      doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
+      node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
+      node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
+      container.appendChild(node);
+    });
+  }
+
+  appendTasksTo(highList, high);
+  appendTasksTo(medList, med);
+  appendTasksTo(lowList, low);
 }
 
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -151,31 +174,93 @@ async function mergeOnSignin(uid){
   try {
     const snap = await get(child(ref(db), `users/${uid}/tasks`));
     const v = snap.exists() ? snap.val() : null;
-    if(!v) await pushTasksToRemote();
+    if(!v){
+      await pushTasksToRemote();
+      return;
+    }
+    const arr = Object.keys(v).map(k => { const it = v[k]; it.id = k; return it; });
+    tasks = arr;
+    saveLocal();
+    render();
   } catch(e){ console.warn('mergeOnSignin err', e); }
+}
+
+/* profile helpers */
+async function saveDisplayName(name){
+  if(!currentUser) return;
+  profileSaveStatus.textContent = 'Saving...';
+  try {
+    // Update Firebase Auth profile
+    await updateProfile(currentUser, { displayName: name });
+    // Also write into realtime DB under users/<uid>/profile
+    await set(ref(db, `users/${currentUser.uid}/profile`), { displayName: name });
+    profileSaveStatus.textContent = 'Saved!';
+    setTimeout(()=> profileSaveStatus.textContent = '', 2000);
+    // update UI
+    applyDisplayNameToUI(name);
+  } catch(e){
+    console.error('saveDisplayName failed', e);
+    profileSaveStatus.textContent = 'Save failed: ' + (e.message || e);
+  }
+}
+
+async function loadProfileFromDb(uid){
+  try {
+    const snap = await get(child(ref(db), `users/${uid}/profile`));
+    if(snap.exists()){
+      return snap.val();
+    }
+  } catch(e){ console.warn('loadProfileFromDb failed', e); }
+  return null;
+}
+
+function applyDisplayNameToUI(name){
+  if(!name) return;
+  guestNote.style.display = 'none';
+  userEmail.style.display = 'block';
+  userEmail.textContent = name;
+  document.getElementById('greeting').textContent = `Welcome, ${name.split(' ')[0] || name}!`;
 }
 
 /* Auth UI */
 async function handleSignClick(){
   if(!currentUser){
-    // default: Google popup
     try { await signInWithPopup(auth, provider); } catch(e){ console.warn('Google sign-in failed', e); alert('Google sign-in failed: '+(e.message||e)); }
   } else {
-    try { await signOut(auth); } catch(e){ console.warn(e); }
+    // show profile page instead when signed in
+    showPage('profile');
   }
 }
 
 onAuthStateChanged(auth, async user => {
   currentUser = user;
   if(user){
+    // first prefer user.displayName; otherwise try DB
+    const nameFromAuth = user.displayName || null;
     guestNote.style.display='none';
     userEmail.style.display='block';
-    userEmail.textContent = user.email || 'Signed in';
+    userEmail.textContent = nameFromAuth || user.email || 'Signed in';
     signBtn.textContent = 'Account';
     profileEmail.textContent = user.email || '';
     profileUid.textContent = user.uid || '';
+
+    // load profile from db if auth displayName not set
+    if(!nameFromAuth){
+      const p = await loadProfileFromDb(user.uid);
+      if(p && p.displayName){
+        applyDisplayNameToUI(p.displayName);
+        profileNameInput.value = p.displayName;
+      } else {
+        profileNameInput.value = '';
+      }
+    } else {
+      applyDisplayNameToUI(nameFromAuth);
+      profileNameInput.value = nameFromAuth;
+    }
+
     await mergeOnSignin(user.uid);
-    // start remote listener that replaces local when remote changes
+
+    // listen for remote tasks changes
     const r = ref(db, `users/${user.uid}/tasks`);
     onValue(r, snap => {
       const v = snap.val();
@@ -189,10 +274,12 @@ onAuthStateChanged(auth, async user => {
       render();
     }, err=> console.warn('remote onValue err', err));
   } else {
+    // signed out
     guestNote.style.display='block';
     userEmail.style.display='none';
     signBtn.textContent = 'Sign in';
-    profileEmail.textContent=''; profileUid.textContent='';
+    profileEmail.textContent=''; profileUid.textContent=''; profileNameInput.value = '';
+    document.getElementById('greeting').textContent = 'Welcome!';
     loadLocal(); render();
   }
 });
@@ -220,6 +307,22 @@ saveTaskBtn.addEventListener('click', ()=>{
 cancelTaskBtn.addEventListener('click', ()=> { taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value=''; taskReminder.checked=false; showPage('home'); });
 
 clearLocalBtn.addEventListener('click', ()=> { if(confirm('Clear local tasks and push empty to remote (if signed in)?')){ tasks=[]; dispatchChange(); render(); if(currentUser) pushTasksToRemote(); } });
+
+saveNameBtn.addEventListener('click', async ()=>{
+  const name = profileNameInput.value && profileNameInput.value.trim();
+  if(!name) return alert('Enter a name to save');
+  if(!currentUser) return alert('Sign in first to save a profile name');
+  await saveDisplayName(name);
+});
+
+refreshProfileBtn.addEventListener('click', async ()=>{
+  if(!currentUser) return;
+  // reload profile name from Auth and DB
+  const authName = currentUser.displayName || '';
+  const dbProfile = await loadProfileFromDb(currentUser.uid);
+  profileNameInput.value = authName || (dbProfile && dbProfile.displayName) || '';
+  if(profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
+});
 
 sortMode.addEventListener('change', render);
 showComplete.addEventListener('change', render);
