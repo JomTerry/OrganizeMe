@@ -1,4 +1,4 @@
-name: Build OrganizeMe APK
+name: Build OrganizeMe APK / AAB
 
 on:
   workflow_dispatch:
@@ -23,19 +23,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - - name: Cache pip, buildozer, gradle
-  uses: actions/cache@v4
-  with:
-    path: |
-      ~/.cache/pip
-      ~/.buildozer
-      ~/.gradle
-    key: ${{ runner.os }}-build-${{ hashFiles('requirements.txt', 'buildozer.spec') }}-${{ github.run_number }}
-    restore-keys: |
-      ${{ runner.os }}-build-
-
-    - name: Install Buildozer
-      run: pip install buildozer==1.5.0
+      - name: Cache pip, buildozer, gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.buildozer
+            ~/.gradle
+          key: ${{ runner.os }}-build-${{ hashFiles('buildozer.spec', 'OrganizeMe/**', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
 
       - name: Install system dependencies
         run: |
@@ -45,18 +42,20 @@ jobs:
             libtool pkg-config zlib1g-dev python3-pip python3-venv \
             libssl-dev libsqlite3-dev libffi-dev
 
-      - name: Install Python build tools (pinned)
+      - name: Install Python build tools
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install --upgrade cython==0.29.33
           python3 -m pip install --upgrade buildozer==1.5.0
 
-      - name: Show repo (debug)
+      - name: Debug repo listing
         run: |
           echo "Repo root listing:"
           ls -la
-          echo "Root files:"
-          ls -la .
+          echo "OrganizeMe folder listing:"
+          ls -la OrganizeMe || true
+          echo "buildozer.spec:"
+          sed -n '1,120p' buildozer.spec || true
 
       - name: Prepare keystore (release only)
         if: ${{ github.event.inputs.build_type == 'release' }}
@@ -70,13 +69,15 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > organizeme.keystore
           ls -la organizeme.keystore
 
-      - name: Build (debug or release)
+      - name: Run buildozer (debug or release)
         env:
           BUILD_TYPE: ${{ github.event.inputs.build_type }}
         run: |
           set -e
+          # ensure buildozer uses the repo root buildozer.spec (default)
           if [ "$BUILD_TYPE" = "release" ]; then
             echo "Running release build..."
+            # buildozer will produce an unsigned release apk/aab for signing
             buildozer -v android release
           else
             echo "Running debug build..."
@@ -92,39 +93,30 @@ jobs:
         run: |
           # find unsigned release apk produced by buildozer
           UNSIGNED=$(ls bin/*-release-unsigned.apk | head -n 1 || true)
-          if [ -z "$UNSIGNED" ]; then
-            echo "No unsigned release APK found in bin/ — aborting." >&2
+          # prefer aab if produced
+          AAB=$(ls bin/*.aab | head -n 1 || true)
+          if [ -n "$AAB" ]; then
+            echo "Found AAB: $AAB (Play Console accepts AAB; you can upload directly)"
+            ls -la "$AAB"
+          elif [ -n "$UNSIGNED" ]; then
+            echo "Unsigned APK: $UNSIGNED"
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore organizeme.keystore -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" "$UNSIGNED" "$KEY_ALIAS"
+            ALIGNED="bin/OrganizeMe-release.apk"
+            zipalign -v 4 "$UNSIGNED" "$ALIGNED"
+            ls -la "$ALIGNED"
+          else
+            echo "No release artifacts found in bin/ — listing bin/"
             ls -la bin || true
             exit 1
           fi
-          echo "Unsigned APK: $UNSIGNED"
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore organizeme.keystore -storepass "$KEYSTORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" "$UNSIGNED" "$KEY_ALIAS"
-          # zipalign (should be available via SDK tools downloaded by buildozer)
-          ALIGNED="bin/OrganizeMe-release.apk"
-          zipalign -v 4 "$UNSIGNED" "$ALIGNED"
-          ls -la "$ALIGNED"
 
-      - name: Upload APK artifact
+      - name: Upload APK / AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OrganizeMe-APK
+          name: OrganizeMe-APK-AAB
           path: |
             bin/*.apk
             bin/*.aab
             bin/*-debug.apk
-
-- name: Check Buildozer version
-  run: |
-    buildozer --version || echo "Buildozer command not found"
-    pip show buildozer
-
-- name: Force uninstall old buildozer
-  run: |
-    pip uninstall -y buildozer || true
-
-			- name: Install Buildozer 1.5.0
-			  run: |
-   			 pip uninstall -y buildozer
-					pip install buildozer==1.5.0
