@@ -4,253 +4,137 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>OrganizeMe</title>
-
-<link id="ext-style" rel="stylesheet" href="style.css" onerror="window.__styleLoaded=false" />
-<style id="fallback-style">
-  /* minimal inline fallback while style.css loads */
-  :root{--bg:#f5f7fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
-  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg)}
-  .wrap{max-width:980px;margin:18px auto;padding:0 16px}
-</style>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<header>
-  <div class="wrap header-row">
-    <div>
-      <h1 class="site-title">OrganizeMe</h1>
-      <div class="site-sub">Task manager</div>
-    </div>
-
-    <div class="auth-area">
-      <!-- shown when signed OUT -->
-      <div id="signed-out-row" class="meta-row">
-        <button id="open-signin" class="ghost">Sign in</button>
-        <button id="open-signup" class="ghost">Sign up</button>
-        <button id="google-login" class="google-btn" aria-label="Sign in with Google">
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo"> Continue with Google
-        </button>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <h1 class="site-title">OrganizeMe</h1>
+        <div class="site-sub">Task manager — sync across devices</div>
       </div>
-
-      <!-- shown when signed IN -->
-      <div id="signed-in-row" class="meta-row" style="display:none">
-        <span class="meta">Signed in as <strong id="auth-email"></strong></span>
-        <button id="signout-btn" class="ghost">Sign out</button>
+      <div class="auth-area">
+        <div id="guest-note" class="meta small">Guest account</div>
+        <div id="user-email" class="meta small" style="display:none"></div>
+        <button id="sign-btn" class="btn ghost">Sign in</button>
       </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<section class="wrap">
-  <div class="card" id="auth-card">
-    <div class="auth-note">
-      <strong>Welcome!</strong>
-      <span class="meta">Sign in to sync across devices (optional).</span>
-    </div>
-    <div id="auth-status" class="small-note meta">You are using a guest account.</div>
-  </div>
-</section>
+  <main class="wrap app-main">
+    <!-- Home -->
+    <section id="page-home" class="page">
+      <div class="home-top card">
+        <div class="greeting">
+          <h2 id="greeting">Welcome back!</h2>
+          <div id="today-count" class="meta">You have 0 tasks due soon</div>
+        </div>
+        <div class="controls">
+          <label class="small">Sort by:
+            <select id="sort-mode">
+              <option value="priority">Priority</option>
+              <option value="date">Due Date</option>
+            </select>
+          </label>
+          <label class="small"><input id="show-complete" type="checkbox" /> Show completed</label>
+        </div>
+      </div>
 
-<main class="wrap main-grid">
-  <section class="card" id="creator">
-    <form id="task-form" onsubmit="return false;">
-      <div class="form-grid">
-        <div class="flex">
-          <label>Task</label>
-          <input id="title" placeholder="e.g. Finish report" required />
+      <div id="sections">
+        <div class="section">
+          <h3 class="section-title">High Priority</h3>
+          <div id="high-list" class="task-list"></div>
         </div>
 
-        <div class="row-row">
-          <div class="date-time">
-            <label>Due date</label>
-            <input id="due" type="date" />
+        <div class="section">
+          <h3 class="section-title">Medium Priority</h3>
+          <div id="med-list" class="task-list"></div>
+        </div>
+
+        <div class="section">
+          <h3 class="section-title">Low Priority</h3>
+          <div id="low-list" class="task-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Add Task -->
+    <section id="page-add" class="page" style="display:none">
+      <div class="card form-card">
+        <button id="back-home" class="btn ghost small">← Back</button>
+        <h2>Add New Task</h2>
+
+        <form id="add-form" onsubmit="return false;">
+          <label>Task name<input id="task-title" required placeholder="Task name" /></label>
+          <label>Description (optional)<textarea id="task-notes" placeholder="Description"></textarea></label>
+
+          <div class="row">
+            <label>Due date<input id="task-date" type="date" /></label>
+            <label>Due time<input id="task-time" type="time" /></label>
           </div>
 
-          <div class="date-time">
-            <label>Due time</label>
-            <input id="time" type="time" />
-          </div>
-
-          <div class="date-time">
-            <label>Priority</label>
-            <select id="importance">
+          <label>Importance
+            <select id="task-priority">
               <option value="High">High</option>
               <option value="Medium" selected>Medium</option>
               <option value="Low">Low</option>
             </select>
+          </label>
+
+          <label>Estimated duration (hours)<input id="task-duration" type="number" min="0" step="0.25" placeholder="e.g. 1.5" /></label>
+
+          <label class="row toggle-row">
+            <span>Reminder</span>
+            <input id="task-reminder" type="checkbox" />
+          </label>
+
+          <div class="row gap">
+            <button id="save-task" class="btn">Save task</button>
+            <button id="cancel-task" class="btn ghost">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Profile -->
+    <section id="page-profile" class="page" style="display:none">
+      <div class="card profile-card">
+        <h2>Profile</h2>
+        <div class="profile-row">
+          <div class="avatar">👤</div>
+          <div>
+            <div id="profile-email" class="strong"></div>
+            <div id="profile-uid" class="meta"></div>
           </div>
         </div>
-
-        <div class="actions">
-          <button id="add-btn">Add</button>
-          <button id="clear-all" class="ghost">Clear</button>
+        <div style="margin-top:12px">
+          <button id="signout-btn" class="btn">Sign out</button>
+          <button id="clear-local" class="btn ghost">Clear local tasks</button>
         </div>
       </div>
-    </form>
-  </section>
+    </section>
+  </main>
 
-  <section class="card" id="list-card">
-    <div class="list-controls">
-      <label>View:
-        <select id="view-mode">
-          <option value="priority">Priority then due</option>
-          <option value="date">Earliest due</option>
-        </select>
-      </label>
-      <label class="show-complete"><input id="show-complete" type="checkbox"> Show completed</label>
-    </div>
+  <nav class="bottom-nav">
+    <button id="nav-home" class="nav-btn active">🏠<span>Home</span></button>
+    <button id="nav-add" class="nav-btn">＋<span>Add</span></button>
+    <button id="nav-profile" class="nav-btn">👤<span>Profile</span></button>
+  </nav>
 
-    <div id="list-wrap"><div class="empty">Loading…</div></div>
-  </section>
-</main>
-
-<!-- Simple modal for sign-in / sign-up -->
-<div id="auth-modal" class="modal" aria-hidden="true">
-  <div class="modal-inner card">
-    <button class="modal-close ghost" id="close-auth">&times;</button>
-    <h3 id="auth-modal-title">Sign in</h3>
-    <form id="auth-form" onsubmit="return false;">
-      <input id="auth-email-input" type="email" placeholder="Email" required />
-      <input id="auth-password-input" type="password" placeholder="Password" minlength="6" required />
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button id="auth-submit">Submit</button>
-        <button id="auth-cancel" class="ghost">Cancel</button>
+  <template id="task-template">
+    <div class="task">
+      <div class="task-left">
+        <div class="task-title"></div>
+        <div class="task-meta meta"></div>
       </div>
-    </form>
-  </div>
-</div>
+      <div class="task-actions">
+        <button class="btn small done-btn"></button>
+        <button class="btn ghost small edit-btn">Edit</button>
+        <button class="btn ghost small del-btn">Delete</button>
+      </div>
+    </div>
+  </template>
 
-<!-- Local fallback task app (offline-first) -->
-<script>
-/*
-  Local fallback: stores tasks in localStorage and exposes window.OrganizeMe API.
-  Task schema: { id, title, notes, due, importance, done, createdAt, updatedAt }
-*/
-(function () {
-  const STORAGE_KEY = 'organizeMe.tasks.v1';
-  const $ = id => document.getElementById(id);
-  let tasks = [];
-
-  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-  function parseDue(s){ if (!s) return null; if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T23:59:59'); return new Date(s); }
-  function fmtDue(s){ if(!s) return ''; if (s.includes('T')) { const [d,t] = s.split('T'); return d + ' ' + t; } return s; }
-
-  function load(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
-  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
-  function dispatchChange(){ window.dispatchEvent(new Event('OrganizeMeTasksChanged')); }
-
-  const title = $('title'), dueEl = $('due'), timeEl = $('time'), importanceEl = $('importance'),
-        listWrap = $('list-wrap'), viewMode = $('view-mode'), showComplete = $('show-complete');
-
-  function importanceRank(i){ return ({High:3,Medium:2,Low:1}[i]||2); }
-  function isDueSoon(dueStr){ if(!dueStr) return false; const d = parseDue(dueStr); if(!d) return false; const diff = d.getTime() - Date.now(); return diff > 0 && diff <= (1000*60*60*24*2); }
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-
-  function render(){
-    const visible = tasks.filter(t => showComplete && showComplete.checked ? true : !t.done);
-    if (!visible.length){ listWrap.innerHTML = '<div class="empty">No tasks yet — add one above.</div>'; return; }
-
-    if (viewMode.value === 'date') {
-      visible.sort((a,b)=>{ const da = parseDue(a.due), db = parseDue(b.due); if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
-    } else {
-      visible.sort((a,b)=>{ const ia = importanceRank(a.importance||'Medium'), ib = importanceRank(b.importance||'Medium'); if (ia!==ib) return ib-ia; const da = parseDue(a.due), db = parseDue(b.due); if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
-    }
-
-    const ul = document.createElement('ul'); ul.className='task-list';
-    visible.forEach(t=>{
-      const li = document.createElement('li'); li.className='task'; if (t.done) li.classList.add('completed');
-
-      const left = document.createElement('div'); left.style.display='flex'; left.style.gap='10px'; left.style.alignItems='center';
-      const badge = document.createElement('div'); badge.className = 'badge ' + (t.importance==='High' ? 'high' : t.importance==='Medium' ? 'med' : 'low'); badge.textContent = t.importance;
-      const info = document.createElement('div');
-      const titleEl = document.createElement('div'); titleEl.innerHTML = '<strong>' + escapeHtml(t.title) + '</strong>';
-      const meta = document.createElement('div'); meta.className='meta';
-      const dueText = t.due ? 'Due ' + fmtDue(t.due) : 'No due date';
-      const soon = isDueSoon(t.due) && !t.done ? ' • <span class="soon">due soon</span>' : '';
-      meta.innerHTML = dueText + (t.notes?(' • '+escapeHtml(t.notes)) : '') + soon;
-      info.appendChild(titleEl); info.appendChild(meta);
-      left.appendChild(badge); left.appendChild(info);
-
-      const ctr = document.createElement('div'); ctr.style.display='flex'; ctr.style.gap='8px';
-      const doneBtn = document.createElement('button'); doneBtn.textContent = t.done ? 'Undo' : 'Done';
-      doneBtn.onclick = ()=>{ t.done = !t.done; t.updatedAt = new Date().toISOString(); save(); render(); };
-      const editBtn = document.createElement('button'); editBtn.className='ghost'; editBtn.textContent='Edit';
-      editBtn.onclick = ()=> openEdit(t);
-      const delBtn = document.createElement('button'); delBtn.className='ghost'; delBtn.textContent='Delete';
-      delBtn.onclick = ()=>{ if(confirm('Delete this task?')){ tasks = tasks.filter(x=>x.id!==t.id); save(); render(); } };
-
-      ctr.appendChild(doneBtn); ctr.appendChild(editBtn); ctr.appendChild(delBtn);
-
-      li.appendChild(left); li.appendChild(ctr);
-      ul.appendChild(li);
-    });
-
-    listWrap.innerHTML=''; listWrap.appendChild(ul);
-  }
-
-  function addTask(){
-    const tTitle = title && title.value.trim();
-    const d = dueEl && dueEl.value ? dueEl.value : null;
-    const tm = timeEl && timeEl.value ? timeEl.value : null;
-    const imp = importanceEl && importanceEl.value ? importanceEl.value : 'Medium';
-    let dueStr = null;
-    if (d && tm) dueStr = d + 'T' + tm;
-    else if (d) dueStr = d;
-    const now = new Date().toISOString();
-    const t = { id: uid(), title: tTitle, notes: '', due: dueStr, importance: imp, done: false, createdAt: now, updatedAt: now };
-    if (!t.title) return alert('Give the task a name.');
-    tasks.push(t); save(); render();
-    if (title) title.value=''; if (dueEl) dueEl.value=''; if (timeEl) timeEl.value=''; if (importanceEl) importanceEl.value='Medium';
-  }
-
-  function openEdit(task){
-    const newTitle = prompt('Edit title', task.title);
-    if (newTitle === null) return;
-    task.title = newTitle.trim() || task.title;
-    const newNotes = prompt('Edit notes', task.notes||'');
-    if (newNotes !== null) task.notes = newNotes.trim();
-    const newDue = prompt('Due (YYYY-MM-DD or YYYY-MM-DDTHH:MM) or blank', task.due||'');
-    if (newDue !== null) task.due = newDue.trim() || null;
-    const newImp = prompt('Priority (High / Medium / Low)', task.importance || 'Medium');
-    if (newImp !== null && ['High','Medium','Low'].includes(newImp)) task.importance = newImp;
-    task.updatedAt = new Date().toISOString();
-    save(); render();
-  }
-
-  function clearAll(){ if(!confirm('Clear all tasks?')) return; tasks=[]; save(); render(); }
-
-  try {
-    document.getElementById('add-btn')?.addEventListener('click', addTask);
-    document.getElementById('clear-all')?.addEventListener('click', clearAll);
-    viewMode?.addEventListener('change', render);
-    showComplete?.addEventListener('change', render);
-  } catch(e){ console.warn('UI wiring failed', e); }
-
-  load(); render();
-
-  // expose API for remote script (index.js)
-  window.OrganizeMe = {
-    getTasks: () => tasks.slice(),
-    replaceTasks: (arr) => {
-      if (!Array.isArray(arr)) return;
-      tasks = arr.map(t => ({
-        id: t.id || uid(),
-        title: t.title || '',
-        notes: t.notes || '',
-        due: t.due || null,
-        importance: t.importance || 'Medium',
-        done: !!t.done,
-        createdAt: t.createdAt || (new Date().toISOString()),
-        updatedAt: t.updatedAt || (new Date().toISOString())
-      }));
-      save(); render();
-    },
-    dispatchChange
-  };
-})();
-</script>
-
-<!-- Firebase-enabled module (Realtime Database + Auth) -->
-<script type="module" src="index.js" defer></script>
-
+  <script type="module" src="index.js" defer></script>
 </body>
 </html>
