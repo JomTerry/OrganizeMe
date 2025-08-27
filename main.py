@@ -58,7 +58,7 @@ class WebViewApp(App):
                     pass
 
                 webview.setWebViewClient(WebViewClient())
-                webview.loadUrl("file:///android_asset/index.html")
+                webview.loadUrl("https://jomterryy417-c0c.web.app/") 
 
                 activity.setContentView(webview)
 
