@@ -5,24 +5,23 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# Permissions required to create the Pages deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Prevent stuck deployments: let latest run cancel earlier ones
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
   deploy:
-    # THIS is the important part — the deploy job must specify an environment
+    # <-- THIS IS REQUIRED by actions/deploy-pages@v4
     environment:
       name: github-pages
 
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,10 +29,16 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Build site
+         run: |
+           npm ci
+           npm run build
+       If your site output is in ./_site or ./build, change the upload path accordingly.
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the folder or files you want published; '.' uploads repo root
+          # change '.' to 'docs' or './_site' if your site lives in a folder
           path: '.'
 
       - name: Deploy to GitHub Pages
