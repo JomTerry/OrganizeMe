@@ -26,17 +26,17 @@
     <section id="page-home" class="page">
       <div class="home-top card">
         <div class="greeting">
-          <h2 id="greeting">Welcome back!</h2>
+          <h2 id="greeting">Welcome!</h2>
           <div id="today-count" class="meta">You have 0 tasks due soon</div>
         </div>
         <div class="controls">
-          <label class="small">Sort by:
+          <label class="small">Sort:
             <select id="sort-mode">
               <option value="priority">Priority</option>
               <option value="date">Due Date</option>
             </select>
           </label>
-          <label class="small"><input id="show-complete" type="checkbox" /> Show completed</label>
+          <label class="small"><input id="show-complete" type="checkbox"> Show completed</label>
         </div>
       </div>
 
@@ -105,6 +105,16 @@
           <div>
             <div id="profile-email" class="strong"></div>
             <div id="profile-uid" class="meta"></div>
+            <div style="margin-top:8px">
+              <label>Display name (what others see)
+                <input id="profile-name-input" placeholder="Your name" />
+              </label>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button id="save-name-btn" class="btn">Save name</button>
+                <button id="refresh-profile" class="btn ghost">Reload profile</button>
+              </div>
+              <div id="profile-save-status" class="meta" style="margin-top:6px"></div>
+            </div>
           </div>
         </div>
         <div style="margin-top:12px">
