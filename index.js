@@ -1,262 +1,227 @@
-// index.js — Realtime Database sync + Auth (email/password + Google popup/redirect)
-// IMPORTANT: databaseURL points to your project's Realtime Database.
+// index.js (module)
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-const FIREBASE_CONFIG = {
+import {
+  getDatabase,
+  ref,
+  onValue,
+  set,
+  get,
+  child
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+const firebaseConfig = {
   apiKey: "AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4",
   authDomain: "jomterryy417-c0c.firebaseapp.com",
-  databaseURL: "https://jomterryy417-c0c-default-rtdb.asia-southeast1.firebasedatabase.app/",
   projectId: "jomterryy417-c0c",
   storageBucket: "jomterryy417-c0c.firebasestorage.app",
   messagingSenderId: "993273611189",
-  appId: "1:993273611189:web:baba2cdc4ff30682904ffc"
+  appId: "1:993273611189:web:baba2cdc4ff30682904ffc",
+  databaseURL: "https://jomterryy417-c0c-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
-const $ = id => document.getElementById(id);
-const LOG = (...args) => console.debug('[OrganizeMe]', ...args);
-const WARN = (...args) => console.warn('[OrganizeMe]', ...args);
-const ERR = (...args) => console.error('[OrganizeMe]', ...args);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+const db = getDatabase(app);
 
-function makeId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+const STORAGE_KEY = 'organizeMe.tasks.v2';
+let tasks = [];
+let currentUser = null;
+let syncTimeout = null;
 
-(async function init() {
-  try {
-    // load modular SDKs
-    const [appMod, authMod, dbMod] = await Promise.all([
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js')
-    ]);
+/* DOM refs */
+const pageHome = document.getElementById('page-home');
+const pageAdd = document.getElementById('page-add');
+const pageProfile = document.getElementById('page-profile');
+const navHome = document.getElementById('nav-home');
+const navAdd = document.getElementById('nav-add');
+const navProfile = document.getElementById('nav-profile');
 
-    const { initializeApp } = appMod;
-    const {
-      getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult,
-      GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
-    } = authMod;
-    const {
-      getDatabase, ref, set, onValue, get, remove
-    } = dbMod;
+const highList = document.getElementById('high-list');
+const medList = document.getElementById('med-list');
+const lowList = document.getElementById('low-list');
+const todayCount = document.getElementById('today-count');
+const sortMode = document.getElementById('sort-mode');
+const showComplete = document.getElementById('show-complete');
 
-    // Initialize Firebase app (databaseURL must be present in config)
-    const app = initializeApp(FIREBASE_CONFIG);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
-    const provider = new GoogleAuthProvider();
+const guestNote = document.getElementById('guest-note');
+const userEmail = document.getElementById('user-email');
+const signBtn = document.getElementById('sign-btn');
 
-    function showSignedInUI(email, providerId) {
-      $('signed-in-row') && ($('signed-in-row').style.display = 'flex');
-      $('signed-out-row') && ($('signed-out-row').style.display = 'none');
-      if ($('auth-email')) $('auth-email').textContent = email || '';
-      if ($('auth-status')) {
-        if (providerId && providerId.includes('google')) $('auth-status').textContent = `Signed in with Google (${email||''})`;
-        else $('auth-status').textContent = `Signed in as ${email||''}`;
-      }
-      try { localStorage.removeItem('organizeMe.signedIn'); } catch(e){}
-    }
-    function showSignedOutUI(){
-      $('signed-in-row') && ($('signed-in-row').style.display = 'none');
-      $('signed-out-row') && ($('signed-out-row').style.display = 'flex');
-      if ($('auth-email')) $('auth-email').textContent = '';
-      if ($('auth-status')) $('auth-status').textContent = 'You are using a guest account.';
-    }
+const taskTitle = document.getElementById('task-title');
+const taskNotes = document.getElementById('task-notes');
+const taskDate = document.getElementById('task-date');
+const taskTime = document.getElementById('task-time');
+const taskPriority = document.getElementById('task-priority');
+const taskDuration = document.getElementById('task-duration');
+const taskReminder = document.getElementById('task-reminder');
+const saveTaskBtn = document.getElementById('save-task');
+const cancelTaskBtn = document.getElementById('cancel-task');
+const backHomeBtn = document.getElementById('back-home');
 
-    // Local storage helpers (mirror index.html behavior)
-    const STORAGE_KEY = 'organizeMe.tasks.v1';
-    function loadLocal(){ try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e){ return []; } }
-    function saveLocal(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); window.dispatchEvent(new Event('OrganizeMeTasksChanged')); }
+const profileEmail = document.getElementById('profile-email');
+const profileUid = document.getElementById('profile-uid');
+const signoutBtn = document.getElementById('signout-btn');
+const clearLocalBtn = document.getElementById('clear-local');
 
-    // Merge remote object into local array, preferring newest updatedAt
-    function mergeRemoteAndLocal(remoteObj) {
-      const remoteArr = remoteObj ? Object.entries(remoteObj).map(([id, val]) => (Object.assign({}, val, { id }))) : [];
-      const local = loadLocal();
-      const map = new Map();
-      local.forEach(l => map.set(l.id, Object.assign({}, l)));
-      remoteArr.forEach(r => {
-        if (!r.id) return;
-        const localItem = map.get(r.id);
-        if (!localItem) map.set(r.id, Object.assign({}, r));
-        else {
-          const rUpdated = r.updatedAt || r.createdAt || 0;
-          const lUpdated = localItem.updatedAt || localItem.createdAt || 0;
-          if (new Date(rUpdated) > new Date(lUpdated)) map.set(r.id, Object.assign({}, r));
-        }
-      });
-      return Array.from(map.values());
-    }
+const taskTemplate = document.getElementById('task-template');
 
-    // Push local array to Realtime DB at /tasks/{uid}
-    async function pushLocalToRemote(uid){
-      try {
-        const local = loadLocal();
-        const baseRef = ref(db, `tasks/${uid}`);
-        const remoteSnap = await get(baseRef);
-        const remoteObj = remoteSnap.exists() ? remoteSnap.val() : {};
-        // Upsert local items
-        for (const t of local) {
-          const id = t.id || makeId();
-          const payload = Object.assign({}, t, { id });
-          await set(ref(db, `tasks/${uid}/${id}`), payload);
-        }
-        // Delete remote items not in local
-        const localIds = new Set(local.map(x => x.id));
-        for (const rid of Object.keys(remoteObj || {})) {
-          if (!localIds.has(rid)) {
-            try { await remove(ref(db, `tasks/${uid}/${rid}`)); } catch(e){ WARN('remote remove failed', rid, e); }
-          }
-        }
-        LOG('pushLocalToRemote complete');
-      } catch(e){ ERR('pushLocalToRemote error', e); }
-    }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function nowISO(){ return new Date().toISOString(); }
+function parseDueToDate(d){ if(!d) return null; if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d+'T23:59:59'); return new Date(d); }
+function formatDueForDisplay(s){ if(!s) return ''; if(s.includes('T')) return s.replace('T',' '); return s; }
+function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); dispatchChange(); }
+function loadLocal(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }catch(e){ tasks=[] } }
+function dispatchChange(){ window.dispatchEvent(new Event('OrganizeMeTasksChanged')); if(currentUser){ if(syncTimeout) clearTimeout(syncTimeout); syncTimeout = setTimeout(()=> pushTasksToRemote(), 900); } else saveLocal(); }
 
-    // subscribe/unsubscribe housekeeping
-    let unsubscribeRemote = null;
-    let applyingRemote = false;
-
-    function subscribeToRemote(uid) {
-      if (unsubscribeRemote) { try { unsubscribeRemote(); } catch(e){ WARN('unsubscribeRemote failed', e); } unsubscribeRemote = null; }
-      const r = ref(db, `tasks/${uid}`);
-      const off = onValue(r, (snap) => {
-        const data = snap.exists() ? snap.val() : null;
-        LOG('onValue snapshot:', data);
-        const merged = mergeRemoteAndLocal(data);
-        // quick equality check by ids+updatedAt
-        const local = loadLocal();
-        try {
-          const localJSON = JSON.stringify((local||[]).map(x=>({id:x.id, updatedAt:x.updatedAt||''})).sort());
-          const mergedJSON = JSON.stringify((merged||[]).map(x=>({id:x.id, updatedAt:x.updatedAt||''})).sort());
-          if (localJSON === mergedJSON) { LOG('remote == local — no apply'); return; }
-        } catch(e){}
-        applyingRemote = true;
-        saveLocal(merged);
-        setTimeout(()=> applyingRemote = false, 700);
-      }, (err) => {
-        ERR('Realtime onValue error', err);
-        if (err && err.code === 'permission-denied') alert('Realtime DB permission denied — check your rules.');
-      });
-      // onValue returns an unsubscribe function in the modular SDK
-      if (typeof off === 'function') unsubscribeRemote = off;
-      LOG('Subscribed to /tasks/' + uid);
-    }
-
-    // Auth state changes
-    onAuthStateChanged(auth, async (user) => {
-      try {
-        if (user) {
-          const providerIds = (user.providerData || []).map(p => p.providerId || '');
-          const usedGoogle = providerIds.includes('google.com');
-          LOG('Signed in', user.uid, user.email, providerIds);
-          showSignedInUI(user.email || user.displayName, usedGoogle ? 'google' : providerIds[0] || '');
-          // Merge/push logic: if remote empty and local has data, push local
-          const baseRef = ref(db, `tasks/${user.uid}`);
-          const snap = await get(baseRef);
-          const remoteObj = snap.exists() ? snap.val() : null;
-          const local = loadLocal();
-          if ((!remoteObj || Object.keys(remoteObj || {}).length === 0) && Array.isArray(local) && local.length > 0) {
-            LOG('Remote empty, pushing local tasks to remote');
-            await pushLocalToRemote(user.uid);
-          } else {
-            if (remoteObj) {
-              const merged = mergeRemoteAndLocal(remoteObj);
-              saveLocal(merged);
-            }
-          }
-          subscribeToRemote(user.uid);
-
-          // local -> remote debounced
-          const handler = () => {
-            if (applyingRemote) { LOG('suppress push (applyingRemote)'); return; }
-            if (handler._timer) clearTimeout(handler._timer);
-            handler._timer = setTimeout(()=> pushLocalToRemote(user.uid), 700);
-          };
-          window.addEventListener('OrganizeMeTasksChanged', handler);
-          // store reference to remove later if needed
-          user._organizeMeHandler = handler;
-        } else {
-          LOG('Signed out');
-          showSignedOutUI();
-          // cleanup
-          if (unsubscribeRemote) { try { unsubscribeRemote(); } catch(e){ WARN('unsubscribeRemote failed', e);} unsubscribeRemote = null; }
-          // remove window handler if attached to previous user
-          // Note: if handler stored on previous user object it's already out of scope; safe to ignore here
-        }
-      } catch (err) {
-        ERR('onAuthStateChanged error', err);
-      }
+function render(){
+  const showCompleted = showComplete.checked;
+  let visible = tasks.filter(t => showCompleted ? true : !t.done);
+  if(sortMode.value === 'date'){
+    visible.sort((a,b) => { const da = parseDueToDate(a.due), db = parseDueToDate(b.due); if(!da && !db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
+  } else {
+    const rank = p => ({High:3,Medium:2,Low:1}[p] || 2);
+    visible.sort((a,b) => {
+      const r = rank(b.priority) - rank(a.priority);
+      if(r) return r;
+      const da = parseDueToDate(a.due), db = parseDueToDate(b.due);
+      if(!da && !db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return da - db;
     });
-
-    // Check redirect result (if using redirect sign-in)
-    try {
-      const res = await getRedirectResult(auth).catch(e => { throw e; });
-      if (res && res.user) LOG('getRedirectResult user', res.user.uid);
-    } catch(e) {
-      WARN('getRedirectResult error', e && e.code, e && e.message);
-      if (e && e.code === 'auth/unauthorized-domain') {
-        alert('Firebase: unauthorized domain. Add your site origin to Authorized domains in Firebase Console (Auth → Sign-in method).');
-      }
-    }
-
-    // Wire UI modal and auth actions (email/password)
-    const openSignin = $('open-signin'), openSignup = $('open-signup');
-    const authModal = $('auth-modal'), authTitle = $('auth-modal-title'), authEmailInput = $('auth-email-input'), authPasswordInput = $('auth-password-input'), authSubmit = $('auth-submit'), authCancel = $('auth-cancel'), closeAuth = $('close-auth');
-
-    function showAuth(mode){
-      if (!authModal) return;
-      authModal.style.display = 'block'; authModal.setAttribute('aria-hidden','false');
-      authModal.dataset.mode = mode;
-      if (authTitle) authTitle.textContent = mode === 'signup' ? 'Sign up' : 'Sign in';
-    }
-    function hideAuth(){ if (!authModal) return; authModal.style.display = 'none'; authModal.setAttribute('aria-hidden','true'); }
-
-    openSignin?.addEventListener('click', ()=> showAuth('signin'));
-    openSignup?.addEventListener('click', ()=> showAuth('signup'));
-    authCancel?.addEventListener('click', hideAuth);
-    closeAuth?.addEventListener('click', hideAuth);
-    authModal?.addEventListener('click', (e)=> { if (e.target === authModal) hideAuth(); });
-
-    authSubmit?.addEventListener('click', async () => {
-      const mode = authModal && authModal.dataset && authModal.dataset.mode ? authModal.dataset.mode : 'signin';
-      const em = authEmailInput && authEmailInput.value.trim();
-      const pw = authPasswordInput && authPasswordInput.value;
-      if (!em || !pw) { alert('Enter email and password'); return; }
-      try {
-        if (mode === 'signup') await createUserWithEmailAndPassword(auth, em, pw);
-        else await signInWithEmailAndPassword(auth, em, pw);
-        hideAuth();
-      } catch (err) {
-        ERR('email auth error', err);
-        alert(err.message || 'Auth failed');
-      }
-    });
-
-    // Google sign-in (popup, fallback to redirect)
-    $('google-login')?.addEventListener('click', async () => {
-      try {
-        LOG('Attempting signInWithPopup');
-        await signInWithPopup(auth, provider);
-        LOG('signInWithPopup success');
-      } catch (err) {
-        LOG('signInWithPopup failed', err && err.code);
-        if (err && err.code === 'auth/unauthorized-domain') {
-          alert('Firebase: unauthorized domain. Add your site origin to Authorized domains in Firebase Console (Auth → Sign-in method).');
-          return;
-        }
-        try {
-          LOG('Falling back to signInWithRedirect');
-          await signInWithRedirect(auth, provider);
-        } catch (e) {
-          ERR('signInWithRedirect failed', e);
-          alert(e.message || 'Google sign-in failed');
-        }
-      }
-    });
-
-    // sign out
-    $('signout-btn')?.addEventListener('click', async ()=> {
-      try { await signOut(auth); LOG('Signed out'); } catch(e){ ERR('signOut failed', e); alert('Sign out failed'); }
-    });
-
-    LOG('Realtime DB auth module initialized.');
-  } catch (err) {
-    ERR('Failed to initialize Firebase modules', err);
-    const statusEl = $('auth-status'); if (statusEl) statusEl.textContent = 'You are using a guest account (Firebase unavailable).';
   }
-})();
+  const dueSoon = visible.filter(t => { if(!t.due) return false; const d = parseDueToDate(t.due); const diff = d.getTime() - Date.now(); return diff > 0 && diff <= 1000*60*60*24*2 && !t.done; }).length;
+  todayCount.textContent = `You have ${dueSoon} tasks due soon`;
+  highList.innerHTML=''; medList.innerHTML=''; lowList.innerHTML='';
+  visible.forEach(t => {
+    const node = taskTemplate.content.firstElementChild.cloneNode(true);
+    node.querySelector('.task-title').textContent = t.title;
+    const metaParts = [];
+    if(t.due) metaParts.push(formatDueForDisplay(t.due));
+    if(t.duration) metaParts.push(`${t.duration} h`);
+    node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
+    const doneBtn = node.querySelector('.done-btn');
+    doneBtn.textContent = t.done ? 'Undo' : 'Mark';
+    doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
+    node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
+    node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
+    if(t.priority === 'High') highList.appendChild(node);
+    else if(t.priority === 'Medium') medList.appendChild(node);
+    else lowList.appendChild(node);
+  });
+}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function addTaskLocal(data){
+  const t = { id: data.id || uid(), title: data.title || 'Untitled', notes: data.notes||'', due: data.due||null, priority: data.priority||'Medium', duration: data.duration||null, reminder: !!data.reminder, done: !!data.done, createdAt: data.createdAt || nowISO() };
+  tasks.push(t); dispatchChange(); render(); return t;
+}
+
+function openEdit(t){
+  const newTitle = prompt('Edit title', t.title); if(newTitle === null) return; t.title = newTitle.trim() || t.title;
+  const newNotes = prompt('Edit notes', t.notes || ''); if(newNotes !== null) t.notes = newNotes.trim();
+  const newDue = prompt('Due (YYYY-MM-DD or YYYY-MM-DDTHH:MM) blank to remove', t.due || ''); if(newDue !== null) t.due = newDue.trim() || null;
+  dispatchChange(); render();
+}
+
+function clearAllLocal(){ if(!confirm('Clear all tasks locally?')) return; tasks = []; dispatchChange(); render(); }
+
+async function pushTasksToRemote(){
+  if(!currentUser) return;
+  try {
+    const map = {};
+    tasks.forEach(t => { const id = t.id || uid(); map[id] = { title: t.title, notes: t.notes||'', due: t.due||null, priority: t.priority||'Medium', duration: t.duration||null, reminder: !!t.reminder, done: !!t.done, createdAt: t.createdAt||nowISO() }; });
+    await set(ref(db, `users/${currentUser.uid}/tasks`), map);
+  } catch(e){ console.warn('pushTasksToRemote failed', e); }
+}
+
+async function mergeOnSignin(uid){
+  try {
+    const snap = await get(child(ref(db), `users/${uid}/tasks`));
+    const v = snap.exists() ? snap.val() : null;
+    if(!v) await pushTasksToRemote();
+  } catch(e){ console.warn('mergeOnSignin err', e); }
+}
+
+/* Auth UI */
+async function handleSignClick(){
+  if(!currentUser){
+    // default: Google popup
+    try { await signInWithPopup(auth, provider); } catch(e){ console.warn('Google sign-in failed', e); alert('Google sign-in failed: '+(e.message||e)); }
+  } else {
+    try { await signOut(auth); } catch(e){ console.warn(e); }
+  }
+}
+
+onAuthStateChanged(auth, async user => {
+  currentUser = user;
+  if(user){
+    guestNote.style.display='none';
+    userEmail.style.display='block';
+    userEmail.textContent = user.email || 'Signed in';
+    signBtn.textContent = 'Account';
+    profileEmail.textContent = user.email || '';
+    profileUid.textContent = user.uid || '';
+    await mergeOnSignin(user.uid);
+    // start remote listener that replaces local when remote changes
+    const r = ref(db, `users/${user.uid}/tasks`);
+    onValue(r, snap => {
+      const v = snap.val();
+      if(!v){
+        if(tasks && tasks.length) pushTasksToRemote();
+        return;
+      }
+      const arr = Object.keys(v).map(k => { const it = v[k]; it.id = k; return it; });
+      tasks = arr;
+      saveLocal();
+      render();
+    }, err=> console.warn('remote onValue err', err));
+  } else {
+    guestNote.style.display='block';
+    userEmail.style.display='none';
+    signBtn.textContent = 'Sign in';
+    profileEmail.textContent=''; profileUid.textContent='';
+    loadLocal(); render();
+  }
+});
+
+/* UI wiring */
+navHome.addEventListener('click', ()=> showPage('home'));
+navAdd.addEventListener('click', ()=> showPage('add'));
+navProfile.addEventListener('click', ()=> showPage('profile'));
+function setActiveNav(id){ [navHome,navAdd,navProfile].forEach(n=>n.classList.remove('active')); if(id==='home') navHome.classList.add('active'); if(id==='add') navAdd.classList.add('active'); if(id==='profile') navProfile.classList.add('active'); }
+function showPage(name){ document.getElementById('page-home').style.display = name==='home' ? '' : 'none'; document.getElementById('page-add').style.display = name==='add' ? '' : 'none'; document.getElementById('page-profile').style.display = name==='profile' ? '' : 'none'; setActiveNav(name); }
+backHomeBtn.addEventListener('click', ()=> { showPage('home'); });
+navHome.click();
+signBtn.addEventListener('click', handleSignClick);
+signoutBtn.addEventListener('click', async ()=> { try { await signOut(auth); } catch(e){ console.warn(e); } });
+
+saveTaskBtn.addEventListener('click', ()=>{
+  const title = taskTitle.value && taskTitle.value.trim(); if(!title) return alert('Please give the task a name');
+  const d = taskDate.value || null; const t = taskTime.value || null; let due = null; if(d && t) due = d + 'T' + t; else if(d) due = d;
+  const item = { title, notes: taskNotes.value.trim() || '', due, priority: taskPriority.value, duration: taskDuration.value ? Number(taskDuration.value) : null, reminder: !!taskReminder.checked, done: false };
+  addTaskLocal(item);
+  taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value=''; taskReminder.checked=false;
+  showPage('home');
+});
+
+cancelTaskBtn.addEventListener('click', ()=> { taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value=''; taskReminder.checked=false; showPage('home'); });
+
+clearLocalBtn.addEventListener('click', ()=> { if(confirm('Clear local tasks and push empty to remote (if signed in)?')){ tasks=[]; dispatchChange(); render(); if(currentUser) pushTasksToRemote(); } });
+
+sortMode.addEventListener('change', render);
+showComplete.addEventListener('change', render);
+
+loadLocal(); render();
