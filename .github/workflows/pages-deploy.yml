@@ -29,25 +29,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-        # Node is cheap to set up; build step will be conditional.
 
       - name: Detect & build (if project has package.json)
         run: |
           set -e
           echo "Working dir: $(pwd)"
-          # Remove any existing out/ from earlier runs
           rm -rf out
           mkdir -p out
           if [ -f package.json ]; then
             echo "package.json found — running npm ci && npm run build (if build script exists)..."
             npm ci --prefer-offline --no-audit --no-fund
-            # If there's a build script, run it; otherwise skip
             if npm run | grep -q "build"; then
               npm run build
             else
               echo "No npm build script defined — skipping npm run build."
             fi
-            # look for common build output folders and copy to ./out
             for d in build dist _site public out_dir public_html; do
               if [ -d "$d" ]; then
                 echo "Found build folder: $d — copying to out/"
@@ -55,18 +51,15 @@ jobs:
                 exit 0
               fi
             done
-            # some projects use 'docs' for pages content
             if [ -d "docs" ]; then
               echo "Found docs/ — copying to out/"
               cp -a docs/. out/
               exit 0
             fi
-            # fallback: copy repo root except .git and .github into out
             echo "No recognized build folder found — copying repo root into out/ (excluding .git)"
             rsync -av --exclude='.git' --exclude='.github' --exclude='node_modules' ./ out/
           else
             echo "No package.json — this looks like a plain static repo."
-            # If docs/ exists, use that; else copy repo root
             if [ -d "docs" ]; then
               echo "Found docs/ — copying to out/"
               cp -a docs/. out/
@@ -87,7 +80,7 @@ jobs:
       - name: Upload artifact for GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          artifact_name: github-pages
+          name: github-pages   # ✅ fixed input name
           path: ./out
 
       - name: Deploy to GitHub Pages
