@@ -18,7 +18,7 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe U
 .btn.small{padding:6px 8px;font-size:14px;border-radius:8px}
 .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:var(--surface-shadow)}
 .app-main{padding-top:12px;padding-bottom:80px}
-.home-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+.home-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;flex-direction:column}
 .greeting h2{margin:0;font-size:20px}
 .controls{display:flex;gap:12px;align-items:center}
 .section{margin-bottom:14px}
@@ -27,15 +27,14 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe U
 .task{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;background:#fafafa;border:1px solid rgba(0,0,0,.03)}
 .task-title{font-weight:700}
 .task-meta{font-size:13px;color:var(--muted)}
-.section:nth-child(1) .task{border-left:6px solid var(--high)}
-.section:nth-child(2) .task{border-left:6px solid var(--med)}
-.section:nth-child(3) .task{border-left:6px solid var(--low)}
+.task .task-left {display:flex;flex-direction:column;gap:4px}
+.task .task-title{font-size:15px}
 .task-actions{display:flex;gap:8px;align-items:center}
-.form-card input[type="text"], .form-card input[type="date"], .form-card input[type="time"], .form-card input[type="number"], .form-card textarea, select {
+.form-card input[type="text"], .form-card input[type="date"], .form-card input[type="time"], .form-card input[type="number"], .form-card textarea, select, input {
   width:100%;padding:10px;border-radius:10px;border:1px solid #e6e9ee;font-size:15px;margin-top:6px;margin-bottom:12px;
 }
 .form-card textarea{min-height:70px;resize:vertical}
-.row{display:flex;gap:12px}
+.row{display:flex;gap:12px;flex-direction:column}
 .row > label{flex:1}
 .toggle-row{align-items:center;justify-content:space-between}
 .gap{gap:12px}
@@ -44,7 +43,12 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe U
 .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #f1f3f5;padding:8px 16px;display:flex;gap:8px;justify-content:space-around;align-items:center}
 .nav-btn{background:transparent;border:0;padding:8px 10px;border-radius:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;color:#6b7280}
 .nav-btn.active{background:#f0f6ff;color:var(--accent)}
+.empty{padding:10px;border-radius:8px;background:transparent;color:var(--muted);text-align:center}
+.section:nth-child(1) .task{border-left:6px solid var(--high)}
+.section:nth-child(2) .task{border-left:6px solid var(--med)}
+.section:nth-child(3) .task{border-left:6px solid var(--low)}
 @media(min-width:720px){
   .home-top{flex-direction:row}
-  .form-card .row{gap:12px}
+  .row{flex-direction:row}
+  .row > label{flex:1}
 }
