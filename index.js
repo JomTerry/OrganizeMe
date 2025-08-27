@@ -21,14 +21,6 @@ import {
   child
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-/*
-  NOTES about Android WebView + OAuth:
-  - If you plan to run this site inside an Android WebView, Google sign-in popup/redirect flows can be problematic.
-  - Recommended for Android: use a system browser / Custom Tabs for OAuth or configure Android native OAuth providers.
-  - If embedding in WebView, ensure your WebView allows universal access from file URLs (or serve the app via https).
-  - In buildozer WebView usage, set setAllowUniversalAccessFromFileURLs(true) and enable debugging to debug auth redirects.
-*/
-
 /* ========== CONFIG - replace if you wish ========== */
 const firebaseConfig = {
   apiKey: "AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4",
