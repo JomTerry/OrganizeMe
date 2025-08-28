@@ -119,23 +119,6 @@ header.site-header{
 .task-title{font-weight:600}
 .task-meta{font-size:13px;color:var(--muted)}
 
-/* overdue visual for the pasaway 💀 */
-.task.overdue {
-  border-left: 6px solid #7f1d1d; /* dark red */
-  background: #fff2f2;            /* soft pink background */
-  color: #7f1d1d;
-}
-.task.overdue .task-title { color: #7f1d1d; }
-.task.overdue .task-meta { color: #7f1d1d; }
-.task.overdue .btn { border-color: rgba(127,29,29,0.08); }
-.task.overdue .btn {
-  background: #7f1d1d;
-  color: #fff;
-}
-.task.overdue .btn:hover {
-  background: #991b1b;
-}
-
 /* buttons */
 button{font:inherit}
 .btn{
@@ -262,32 +245,36 @@ button{font:inherit}
 #overdue-list {
 }
 
+/* Overdue visual for the pasaway 💀 */
 #overdue-list .task,
 .task.overdue {
-  border-left: 6px solid var(--high-accent) !important; /* dark red left edge */
-  background: #fff2f2 !important;                         /* pale red/pink bg */
-  color: var(--high-accent) !important;                  /* text in dark red */
+  border-left: 6px solid #7f1d1d; /* dark red */
+  background: #fff2f2;            /* soft pink background */
+  color: #7f1d1d;
 }
 
 #overdue-list .task .task-title,
 .task.overdue .task-title {
-  color: var(--high-accent) !important;
+  color: #7f1d1d;
 }
+
 #overdue-list .task .task-meta,
 .task.overdue .task-meta {
-  color: rgba(127,29,29,0.95) !important;
+  color: rgba(127,29,29,0.95);
 }
 
 #overdue-list .task .btn.ghost,
 .task.overdue .btn.ghost {
-  color: var(--high-accent);
+  color: #7f1d1d;
   border-color: rgba(127,29,29,0.12);
 }
+
 #overdue-list .task .btn,
 .task.overdue .btn {
-  background: var(--high-accent);
+  background: #7f1d1d;
   color: #fff;
 }
+
 #overdue-list .task .btn:hover,
 .task.overdue .btn:hover {
   background: #991b1b;
