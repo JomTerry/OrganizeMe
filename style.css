@@ -95,7 +95,7 @@ header.site-header{
 .small{font-size:13px}
 .meta{font-size:13px;color:var(--muted)}
 
-/* sections vertical */
+/* vertical */
 #sections{display:flex;flex-direction:column;gap:12px}
 .card-section{padding:12px}
 
@@ -246,46 +246,80 @@ button{font:inherit}
 }
 
 /* Overdue visual for the pasaway 💀 */
+:root{
+  --overdue-accent: #6b1212;
+  --overdue-bg: linear-gradient(90deg, rgba(107,18,18,0.04), rgba(255,242,242,0.02));
+}
+
 #overdue-list .task,
 .task.overdue {
-  border-left: 6px solid #7f1d1d; /* dark red */
-  background: #fff2f2;            /* soft pink background */
-  color: #7f1d1d;
+  border-left: 6px solid var(--overdue-accent) !important;
+  background: var(--overdue-bg) !important;
+  color: var(--overdue-accent);
 }
 
 #overdue-list .task .task-title,
 .task.overdue .task-title {
-  color: #7f1d1d;
+  color: var(--overdue-accent) !important;
 }
-
 #overdue-list .task .task-meta,
 .task.overdue .task-meta {
-  color: rgba(127,29,29,0.95);
+  color: rgba(107,18,18,0.95) !important;
 }
 
-#overdue-list .task .btn.ghost,
-.task.overdue .btn.ghost {
-  color: #7f1d1d;
-  border-color: rgba(127,29,29,0.12);
+.task-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-#overdue-list .task .btn,
-.task.overdue .btn {
-  background: #7f1d1d;
-  color: #fff;
+.task-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 6px 10px;
+  min-width: 56px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.task .done-btn { background: var(--accent); color: #fff; border: 0; }
+
+#overdue-list .task .done-btn,
+.task.overdue .done-btn {
+  background: var(--overdue-accent) !important;
+  color: #fff !important;
+  border: 0;
+}
+
+#overdue-list .task .edit-btn,
+.task.overdue .edit-btn {
+  background: #fff !important;
+  color: var(--overdue-accent) !important;
+  border: 1px solid rgba(107,18,18,0.12) !important;
+  box-shadow: 0 1px 2px rgba(107,18,18,0.03);
+}
+
+#overdue-list .task .del-btn,
+.task.overdue .del-btn {
+  background: transparent !important;
+  color: var(--overdue-accent) !important;
+  border: 1px solid rgba(107,18,18,0.08);
 }
 
 #overdue-list .task .btn:hover,
 .task.overdue .btn:hover {
-  background: #991b1b;
+  filter: brightness(0.95);
 }
 
-#overdue-list .task:focus,
-#overdue-list .task .btn:focus {
-  outline: 3px solid rgba(217,70,70,0.18);
+.task-actions .btn:focus {
+  outline: 3px solid rgba(107,18,18,0.14);
   outline-offset: 3px;
 }
 
 @media (max-width: 900px) {
   #overdue-list .task { padding: 12px; }
+  .task-actions .btn { height: 40px; min-width: 60px; }
 }
