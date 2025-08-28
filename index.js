@@ -87,6 +87,28 @@ const signinForm = $('form-signin'), signupForm = $('form-signup');
 const signinEmail = $('signin-email'), signinPassword = $('signin-password'), signinStatus = $('signin-status'), signinSubmit = $('signin-submit');
 const signupEmail = $('signup-email'), signupPassword = $('signup-password'), signupConfirm = $('signup-confirm'), signupStatus = $('signup-status'), signupSubmit = $('signup-submit');
 const taskTemplate = $('task-template');
+// select 0-1000 (shows a wheel on mobile)
+(function replaceDurationWithSelect(maxValue = 1000) {
+  const old = document.getElementById('task-duration');
+  if (!old) return;
+
+  const sel = document.createElement('select');
+  sel.id = old.id;
+  sel.name = old.name || old.id;
+  sel.className = old.className || '';
+  sel.setAttribute('aria-label', 'Estimated duration (hours)');
+
+  // populate 0..maxValue
+  for (let i = 0; i <= maxValue; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = i + ' Hours';
+    sel.appendChild(opt);
+  }
+
+  // replace old input with the new select in DOM
+  old.parentNode.replaceChild(sel, old);
+})(1000);
 
 const verifiedWarning = $('verified-warning');
 
@@ -150,7 +172,7 @@ function appendTasksTo(container, arr){
     node.querySelector('.task-title').textContent = t.title;
     const metaParts = [];
     if(t.due) metaParts.push(formatDueForDisplay(t.due));
-    if(t.duration) metaParts.push(`${t.duration} h`);
+		if (t.duration != null) metaParts.push(`${t.duration} Hours`);
     node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
     node.setAttribute('data-priority', t.priority || 'Medium');
     const doneBtn = node.querySelector('.done-btn');
@@ -520,14 +542,28 @@ saveTaskBtn.addEventListener('click', ()=>{
   const title = taskTitle.value && taskTitle.value.trim();
   if(!title) return showToast('Please give the task a name', 'error');
   const d = taskDate.value || null; const t = taskTime.value || null; let due = null; if(d && t) due = d + 'T' + t; else if(d) due = d;
-  const item = { title, notes: taskNotes.value.trim() || '', due, priority: taskPriority.value, duration: taskDuration.value ? Number(taskDuration.value) : null, reminder: !!taskReminder.checked, done: false };
+  const rawDur = taskDuration.value;
+  const durNum = rawDur === '' ? null : Number(rawDur);
+  const duration = (durNum === 0) ? null : durNum; // treat 0 as "no value"
+
+  const item = {
+    title,
+    notes: taskNotes.value.trim() || '',
+    due,
+    priority: taskPriority.value,
+    duration,
+    reminder: !!taskReminder.checked,
+    done: false
+  };
+  // ===================================================================================
+
   addTaskLocal(item);
-  taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value=''; taskReminder.checked=false;
+  taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value='0'; taskReminder.checked=false;
   showPage('home');
   showToast('Task added', 'success');
 });
 
-cancelTaskBtn.addEventListener('click', ()=> { taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value=''; taskReminder.checked=false; showPage('home'); });
+cancelTaskBtn.addEventListener('click', ()=> { taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value='0'; taskReminder.checked=false; showPage('home'); });
 
 clearLocalBtn.addEventListener('click', ()=> { if(confirm('Clear local tasks and push empty to remote (if signed in)?')){ tasks=[]; dispatchChange(); render(); if(currentUser && currentUser.emailVerified) pushTasksToRemote(); } });
 
