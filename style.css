@@ -127,6 +127,23 @@ header.site-header{
 .task-title{font-weight:600}
 .task-meta{font-size:13px;color:var(--muted)}
 
+/* overdue visual */
+.task.overdue {
+  border-left: 6px solid #7f1d1d; /* dark red */
+  background: #fff2f2;            /* soft pink background */
+  color: #7f1d1d;
+}
+.task.overdue .task-title { color: #7f1d1d; }
+.task.overdue .task-meta { color: #7f1d1d; }
+.task.overdue .btn { border-color: rgba(127,29,29,0.08); }
+.task.overdue .btn {
+  background: #7f1d1d;
+  color: #fff;
+}
+.task.overdue .btn:hover {
+  background: #991b1b;
+}
+
 /* buttons */
 button{font:inherit}
 .btn{
