@@ -341,13 +341,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function appendTasksTo(container, arr){
-      if(!container) return;
-      if(!arr || !arr.length){
-        const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No tasks yet!'; container.appendChild(e); return;
-      }
-      if(!taskTemplate || !taskTemplate.content){
-        const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Task template missing'; container.appendChild(e); console.error('Missing #task-template'); return;
-      }
+			if(!arr || !arr.length){
+			  const e = document.createElement('div');
+        e.className = 'empty';
+			  	if (container.id === 'overdue-list') {
+    			e.textContent = 'Good job! You have no overdue! 🥳';
+			  } else {
+					e.textContent = 'No tasks yet!';
+			  }
+			  container.appendChild(e);
+			  return;
+			}
       arr.forEach(t=>{
         const node = taskTemplate.content.firstElementChild.cloneNode(true);
         const titleEl = node.querySelector('.task-title');
