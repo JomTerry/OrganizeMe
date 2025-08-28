@@ -261,7 +261,7 @@ function applyDisplayNameToUI(name){
   guestNote.style.display = 'none';
   userEmail.style.display = 'block';
   userEmail.textContent = name;
-  $('greeting').textContent = `Welcome, ${name.split(' ')[0] || name}!`;
+  $('greeting').textContent = `Welcome, ${name.split(' ')[0] || name}! 😌`;
 }
 
 /* ========== AUTH flows ========== */
@@ -512,7 +512,7 @@ onAuthStateChanged(auth, async user => {
     profileSignedOut.style.display = '';
     profileSignedIn.style.display = 'none';
     profileEmail.textContent = ''; profileUid.textContent = ''; profileNameInput.value = '';
-    $('greeting').textContent = 'Welcome!';
+    $('greeting').textContent = 'Welcome! 😌';
     loadLocal(); render();
   }
 });
