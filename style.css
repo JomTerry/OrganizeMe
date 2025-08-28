@@ -21,7 +21,7 @@ html,body{height:100%; margin:0; background:var(--bg); color:#111}
 .header-right{display:flex;align-items:center;gap:12px}
 .user-email{font-weight:600}
 
-/* auth buttons on top-right */
+/* auth buttons */
 .auth-buttons{display:flex; gap:8px; align-items:center}
 .btn.small{padding:8px 10px; font-size:13px}
 .btn.ghost.small{border:1px solid rgba(255,255,255,.16); color: #fff; background: transparent}
@@ -58,7 +58,7 @@ textarea{resize:vertical}
 .group-row{display:flex; gap:12px; align-items:end}
 .group-row .small-field label{margin-bottom:4px}
 
-/* place pw-toggle inside input */
+/* pw-toggle */
 .pw-toggle{
   position:absolute;
   right:8px;
