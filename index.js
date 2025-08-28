@@ -1,4 +1,3 @@
-// index.js (module) - robust + diagnostic + auto-inject fallback for Add/Profile
 // Firebase web SDK v10 imports
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
