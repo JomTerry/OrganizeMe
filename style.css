@@ -34,7 +34,6 @@ header.site-header{
   z-index: 10;
 }
 
-/* keep layout vertical while preserving spacing */
 .header-inner{
   display:flex;
   flex-direction:column;
@@ -46,7 +45,6 @@ header.site-header{
   color: #fff; 
 }
 
-/* title + subtitle */
 .site-title{
   margin: .1rem 0;
   font-size: 1.35rem;
@@ -58,27 +56,23 @@ header.site-header{
   font-size: .95rem;
 }
 
-/* make ghost buttons contrast nicely on blue background */
 .header-inner .btn.ghost{
   background: rgba(255,255,255,0.08);
   color: #fff;
   border: 1px solid rgba(255,255,255,0.12);
 }
 
-/* small tweak so Google btn looks good on blue */
 .header-inner .btn.google-btn{
   background:#fff;
   color:#111;
   border:1px solid rgba(0,0,0,0.06);
 }
 
-/* Ensure text in auth-info uses white on header */
 .auth-info .meta.small, 
 .auth-info .meta{
   color: rgba(255,255,255,0.92);
 }
 
-/* Auth area */
 .auth-area{
   display:flex;
   flex-direction:row;
@@ -91,13 +85,11 @@ header.site-header{
 .auth-buttons{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .email-actions{display:flex;gap:6px;align-items:center}
 
-/* simple card */
 .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
 
 /* layout */
 .app-main{margin-top:14px;display:flex;flex-direction:column;gap:12px}
 
-/* Home top */
 .home-top{display:flex;flex-direction:column;gap:8px;padding:12px}
 .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .small{font-size:13px}
@@ -127,7 +119,7 @@ header.site-header{
 .task-title{font-weight:600}
 .task-meta{font-size:13px;color:var(--muted)}
 
-/* overdue visual */
+/* overdue visual for the pasaway 💀 */
 .task.overdue {
   border-left: 6px solid #7f1d1d; /* dark red */
   background: #fff2f2;            /* soft pink background */
@@ -184,7 +176,6 @@ button{font:inherit}
 .form-card .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .toggle-row{align-items:center;justify-content:space-between}
 
-/* input-wrap + pw-toggle */
 .input-wrap{position:relative}
 .input-wrap input{width:100%;padding:8px 40px 8px 8px;border-radius:8px;border:1px solid #e6e9ee;margin-top:6px}
 .pw-toggle{
@@ -204,7 +195,6 @@ button{font:inherit}
 }
 .input-wrap .pw-toggle svg{opacity:.9}
 
-/* bottom nav compact */
 .bottom-nav{
   position:fixed;
   left:50%;
@@ -227,7 +217,6 @@ button{font:inherit}
 }
 .nav-btn.active{outline:3px solid rgba(11,99,214,.08)}
 
-/* empty placeholder */
 .empty{text-align:center;color:var(--muted);padding:18px}
 
 /* profile */
@@ -258,14 +247,58 @@ button{font:inherit}
   transition:opacity .18s ease
 }
 
-/* responsive: keep vertical stacking at smaller widths */
 @media(min-width:900px){
   .header-inner{align-items:flex-start}
   .auth-area{flex-direction:row}
   .app-main{max-width:900px}
 }
 
-/* small utilities */
 .row{display:flex;gap:10px;align-items:center}
 .gap{gap:8px}
 .link{color:var(--accent); text-decoration:none}
+
+.overdue-section .section-title,
+#overdue-list + .section-title,
+#overdue-list {
+}
+
+#overdue-list .task,
+.task.overdue {
+  border-left: 6px solid var(--high-accent) !important; /* dark red left edge */
+  background: #fff2f2 !important;                         /* pale red/pink bg */
+  color: var(--high-accent) !important;                  /* text in dark red */
+}
+
+#overdue-list .task .task-title,
+.task.overdue .task-title {
+  color: var(--high-accent) !important;
+}
+#overdue-list .task .task-meta,
+.task.overdue .task-meta {
+  color: rgba(127,29,29,0.95) !important;
+}
+
+#overdue-list .task .btn.ghost,
+.task.overdue .btn.ghost {
+  color: var(--high-accent);
+  border-color: rgba(127,29,29,0.12);
+}
+#overdue-list .task .btn,
+.task.overdue .btn {
+  background: var(--high-accent);
+  color: #fff;
+}
+#overdue-list .task .btn:hover,
+.task.overdue .btn:hover {
+  background: #991b1b;
+}
+
+#overdue-list .task:focus,
+#overdue-list .task .btn:focus {
+  outline: 3px solid rgba(217,70,70,0.18);
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  #overdue-list .task { padding: 12px; }
+}
