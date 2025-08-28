@@ -711,7 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (profileSignedOut) profileSignedOut.style.display = '';
         if (profileSignedIn) profileSignedIn.style.display = 'none';
         if (profileEmail) profileEmail.textContent = ''; if (profileUid) profileUid.textContent = ''; if (profileNameInput) profileNameInput.value = '';
-        const g = $('greeting'); if (g) g.textContent = 'Welcome! 😌';
+        const g = $('greeting'); if (g) g.textContent = '🏠 Welcome! 😌';
         loadLocal(); render();
       }
     });
