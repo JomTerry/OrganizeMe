@@ -94,17 +94,24 @@ function createAddPageFallback(containerId = 'page-add') {
   frag.appendChild(card);
   container.appendChild(frag);
 
-  (function fillDur() {
-    const sel = document.getElementById('task-duration');
-    if (!sel) return;
-    sel.innerHTML = '';
-    for (let i = 0; i <= 1000; i++) {
-      const opt = document.createElement('option');
-      opt.value = String(i);
-      opt.textContent = i + ' Hours';
-      sel.appendChild(opt);
+(function fillDur() {
+  const sel = document.getElementById('task-duration');
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (let i = 0; i <= 1000; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    if (i === 0) {
+      opt.textContent = '0 hours (default)';
+      opt.selected = true;
+    } else if (i === 1) {
+      opt.textContent = '1 hour';
+    } else {
+      opt.textContent = `${i} hours`;
     }
-  })();
+    sel.appendChild(opt);
+  }
+})();
 
   return container;
 }
@@ -348,7 +355,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const metaEl = node.querySelector('.task-meta');
         const metaParts = [];
         if(t.due) metaParts.push(formatDueForDisplay(t.due));
-        if (t.duration != null && t.duration !== 0) metaParts.push(`${t.duration} Hours`);
+        if (t.duration !== null && t.duration !== undefined) {
+  				if (t.duration === 0) {
+				    metaParts.push('0 hours');
+				  } else if (t.duration === 1) {
+    				metaParts.push('1 hour');
+				  } else {
+    			metaParts.push(`${t.duration} hours`);
+  				}
+}
         if (metaEl) metaEl.innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
 
         node.setAttribute('data-priority', t.priority || 'Medium');
@@ -721,11 +736,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const title = taskTitle && taskTitle.value && taskTitle.value.trim();
       if(!title) return showToast('Please give the task a name', 'error');
       const d = taskDate ? taskDate.value || null : null; const t = taskTime ? taskTime.value || null : null; let due = null; if(d && t) due = d + 'T' + t; else if(d) due = d;
-      const rawDurEl = document.getElementById('task-duration');
-      const rawDur = rawDurEl ? rawDurEl.value : '';
-      const durNum = rawDur === '' ? null : Number(rawDur);
-      const duration = (durNum === 0) ? null : durNum;
-
+			const rawDurEl = document.getElementById('task-duration');
+			const rawDur = rawDurEl ? rawDurEl.value : '';
+			const durNum = rawDur === '' ? 0 : Number(rawDur);
+			const duration = durNum; 
       const item = {
         title,
         notes: taskNotes && taskNotes.value ? taskNotes.value.trim() : '',
