@@ -67,7 +67,7 @@ let resendCooldown = false;
 /* DOM refs */
 const pageHome = $('page-home'), pageAdd = $('page-add'), pageProfile = $('page-profile');
 const navHome = $('nav-home'), navAdd = $('nav-add'), navProfile = $('nav-profile');
-const highList = $('high-list'), medList = $('med-list'), lowList = $('low-list');
+const highList = $('high-list'), medList = $('med-list'), lowList = $('low-list'), overdueList = $('overdue-list');
 const todayCount = $('today-count');
 const sortMode = $('sort-mode'), showComplete = $('show-complete');
 
@@ -112,7 +112,7 @@ const taskTemplate = $('task-template');
 
 const verifiedWarning = $('verified-warning');
 
-/* ========== Storage functions ========== */
+/* Storage */
 function loadLocal(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
 function saveLocal(){ 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); 
@@ -129,18 +129,32 @@ function dispatchChange() {
   }
 }
 
-/* ========== Render logic ========== */
-function render(){
+/* Render logic */
+function render() {
   const showCompleted = showComplete.checked;
-  let visible = tasks.filter(t => showCompleted ? true : !t.done);
+  // base visible set (respect show-complete)
+  let baseVisible = tasks.filter(t => showCompleted ? true : !t.done);
 
-  if(sortMode.value === 'date'){
-    visible.sort((a,b)=>{ const da = parseDueToDate(a.due), db = parseDueToDate(b.due); if(!da && !db) return 0; if(!da) return 1; if(!db) return -1; return da - db; });
+  // compute overdue separately (not done & due < now)
+  const overdueArr = baseVisible.filter(t => isOverdue(t));
+
+  // remove overdue from baseVisible so they don't show in priority lists
+  const nonOverdue = baseVisible.filter(t => !isOverdue(t));
+
+  // sorting logic applied to nonOverdue (as before)
+  if (sortMode.value === 'date') {
+    nonOverdue.sort((a,b) => {
+      const da = parseDueToDate(a.due), db = parseDueToDate(b.due);
+      if(!da && !db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return da - db;
+    });
   } else {
-    const rank = p => ({High:3,Medium:2,Low:1}[p] || 2);
-    visible.sort((a,b)=>{
+    const rank = p => ({High:3, Medium:2, Low:1}[p] || 2);
+    nonOverdue.sort((a,b) => {
       const r = rank(b.priority) - rank(a.priority);
-      if(r) return r;
+      if (r) return r;
       const da = parseDueToDate(a.due), db = parseDueToDate(b.due);
       if(!da && !db) return 0;
       if(!da) return 1;
@@ -149,18 +163,30 @@ function render(){
     });
   }
 
-  const dueSoon = visible.filter(t => { if(!t.due) return false; const d = parseDueToDate(t.due); const diff = d.getTime() - Date.now(); return diff > 0 && diff <= 1000*60*60*24*2 && !t.done; }).length;
+  // count tasks due soon (2 days)
+  const dueSoon = nonOverdue.filter(t => {
+    if (!t.due) return false;
+    const d = parseDueToDate(t.due);
+    const diff = d.getTime() - Date.now();
+    return diff > 0 && diff <= 1000*60*60*24*2 && !t.done;
+  }).length;
   todayCount.textContent = `You have ${dueSoon} tasks due soon`;
 
-  highList.innerHTML = ''; medList.innerHTML = ''; lowList.innerHTML = '';
+  // clear lists
+  highList.innerHTML = '';
+  medList.innerHTML = '';
+  lowList.innerHTML = '';
+  overdueList.innerHTML = '';
 
-  const high = visible.filter(t => t.priority === 'High');
-  const med = visible.filter(t => t.priority === 'Medium');
-  const low = visible.filter(t => t.priority === 'Low');
+  // split into different priorities
+  const high = nonOverdue.filter(t => t.priority === 'High');
+  const med  = nonOverdue.filter(t => t.priority === 'Medium');
+  const low  = nonOverdue.filter(t => t.priority === 'Low');
 
   appendTasksTo(highList, high);
   appendTasksTo(medList, med);
   appendTasksTo(lowList, low);
+  appendTasksTo(overdueList, overdueArr);
 }
 
 function appendTasksTo(container, arr){
