@@ -93,25 +93,6 @@ function createAddPageFallback(containerId = 'page-add') {
   frag.appendChild(card);
   container.appendChild(frag);
 
-(function fillDur() {
-  const sel = document.getElementById('task-duration');
-  if (!sel) return;
-  sel.innerHTML = '';
-  for (let i = 0; i <= 1000; i++) {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    if (i === 0) {
-      opt.textContent = '0 hours (default)';
-      opt.selected = true;
-    } else if (i === 1) {
-      opt.textContent = '1 hour';
-    } else {
-      opt.textContent = `${i} hours`;
-    }
-    sel.appendChild(opt);
-  }
-})();
-
   return container;
 }
 
@@ -212,6 +193,26 @@ const EXPECTED_IDS = [
 
 
 document.addEventListener('DOMContentLoaded', () => {
+
+(function fillDur() {
+  const sel = document.getElementById('task-duration');
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (let i = 0; i <= 1000; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    if (i === 0) {
+      opt.textContent = '0 hours (default)';
+      opt.selected = true;
+    } else if (i === 1) {
+      opt.textContent = '1 hour';
+    } else {
+      opt.textContent = `${i} hours`;
+    }
+    sel.appendChild(opt);
+  }
+})();
+
   try {
     // diagnostic
     const missing = findMissingIds(EXPECTED_IDS);
