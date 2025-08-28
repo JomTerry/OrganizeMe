@@ -114,9 +114,11 @@
           </label>
 
           <label>Estimated duration (Hours)
-            <input id="task-duration" type="number" min="0" step="0.25" placeholder="e.g. 1.5" inputmode="decimal" />
-          </label>
-
+					  <select id="task-duration">
+					    <option value="" disabled selected>Select hours</option>
+					  </select>
+					</label>
+          
           <label class="row toggle-row">
             <span>Reminder</span>
             <input id="task-reminder" type="checkbox" />
