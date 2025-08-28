@@ -14,12 +14,12 @@ import {
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-	  getDatabase,
-    ref,
-  	onValue,
-  	set,
-  	get,
-  	child
+  getDatabase,
+  ref,
+  onValue,
+  set,
+  get,
+  child
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 const firebaseConfig = {
@@ -37,17 +37,26 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getDatabase(app);
 
-const $ = id => document.getElementById(id);
+// safer $ helper that logs missing elements
+const $ = (id) => {
+  const el = document.getElementById(id);
+  if (!el) console.warn(`DOM element not found: #${id}`);
+  return el;
+};
+
+// small helpers
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function nowISO(){ return new Date().toISOString(); }
 function parseDueToDate(d){ if(!d) return null; if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d+'T23:59:59'); return new Date(d); }
 function formatDueForDisplay(s){ if(!s) return ''; if(s.includes('T')) return s.replace('T',' '); return s; }
 
-/* Toast */
 const toastEl = $('toast');
 let toastTimer = null;
 function showToast(msg, type='info', ms=3000){
-  if(!toastEl) return;
+  if(!toastEl) {
+    console.warn('toast element missing, message:', msg);
+    return;
+  }
   toastEl.textContent = msg;
   toastEl.style.background = (type === 'error') ? '#b91c1c' : (type === 'success' ? '#027a48' : '#111');
   toastEl.style.opacity = '1';
@@ -61,6 +70,7 @@ let currentUser = null;
 let syncTimeout = null;
 let resendCooldown = false;
 
+/* DOM references: these may be null if HTML differs — checks below will report missing ones */
 const pageHome = $('page-home'), pageAdd = $('page-add'), pageProfile = $('page-profile');
 const navHome = $('nav-home'), navAdd = $('nav-add'), navProfile = $('nav-profile');
 const highList = $('high-list'), medList = $('med-list'), lowList = $('low-list'), overdueList = $('overdue-list');
@@ -82,40 +92,47 @@ const signoutBtn = $('signout-btn'), clearLocalBtn = $('clear-local');
 const signinForm = $('form-signin'), signupForm = $('form-signup');
 const signinEmail = $('signin-email'), signinPassword = $('signin-password'), signinStatus = $('signin-status'), signinSubmit = $('signin-submit');
 const signupEmail = $('signup-email'), signupPassword = $('signup-password'), signupConfirm = $('signup-confirm'), signupStatus = $('signup-status'), signupSubmit = $('signup-submit');
-const taskTemplate = $('task-template');
+const taskTemplateEl = $('task-template');
 
-// select 0-1000 
+// quick required-elements check to surface missing IDs in console
+(function sanityCheck() {
+  const required = [
+    'page-home','page-add','page-profile',
+    'nav-home','nav-add','nav-profile',
+    'task-template','task-duration','save-task',
+    'profile-signedin','profile-signedout','toast'
+  ];
+  required.forEach(id => {
+    if (!$(id)) {
+      console.error(`Missing required DOM element: #${id} — this can cause blank pages. Verify your index.html has the right IDs.`);
+    }
+  });
+})();
+
+// replace duration input by a select 0..1000
 (function replaceDurationWithSelect(maxValue = 1000) {
   const old = document.getElementById('task-duration');
   if (!old) return;
-
   const sel = document.createElement('select');
   sel.id = old.id;
   sel.name = old.name || old.id;
   sel.className = old.className || '';
   sel.setAttribute('aria-label', 'Estimated duration (hours)');
-
   for (let i = 0; i <= maxValue; i++) {
     const opt = document.createElement('option');
     opt.value = String(i);
     opt.textContent = i + ' Hours';
     sel.appendChild(opt);
   }
-
   old.parentNode.replaceChild(sel, old);
 })(1000);
 
-const verifiedWarning = $('verified-warning');
-
 /* Storage */
 function loadLocal(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
-function saveLocal(){ 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); 
-}
+function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
 
 function dispatchChange() {
   window.dispatchEvent(new Event('OrganizeMeTasksChanged'));
-
   if (currentUser && currentUser.emailVerified) {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(pushTasksToRemote, 900);
@@ -126,15 +143,14 @@ function dispatchChange() {
 
 /* Render logic */
 function render() {
-  const showCompleted = showComplete.checked;
+  if (!Array.isArray(tasks)) tasks = [];
+  const showCompleted = (showComplete && showComplete.checked) || false;
 
   let baseVisible = tasks.filter(t => showCompleted ? true : !t.done);
-
   const overdueArr = baseVisible.filter(t => isOverdue(t));
-
   const nonOverdue = baseVisible.filter(t => !isOverdue(t));
 
-  if (sortMode.value === 'date') {
+  if (sortMode && sortMode.value === 'date') {
     nonOverdue.sort((a,b) => {
       const da = parseDueToDate(a.due), db = parseDueToDate(b.due);
       if(!da && !db) return 0;
@@ -155,52 +171,65 @@ function render() {
     });
   }
 
-  // count tasks due soon (2 days)
   const dueSoon = nonOverdue.filter(t => {
     if (!t.due) return false;
     const d = parseDueToDate(t.due);
     const diff = d.getTime() - Date.now();
     return diff > 0 && diff <= 1000*60*60*24*2 && !t.done;
   }).length;
-  todayCount.textContent = `You have ${dueSoon} tasks due soon`;
+  if (todayCount) todayCount.textContent = `You have ${dueSoon} tasks due soon`;
 
-  // clear lists
-  highList.innerHTML = '';
-  medList.innerHTML = '';
-  lowList.innerHTML = '';
-  overdueList.innerHTML = '';
+  if (highList) highList.innerHTML = '';
+  if (medList) medList.innerHTML = '';
+  if (lowList) lowList.innerHTML = '';
+  if (overdueList) overdueList.innerHTML = '';
 
-  // split into different priorities
   const high = nonOverdue.filter(t => t.priority === 'High');
   const med  = nonOverdue.filter(t => t.priority === 'Medium');
   const low  = nonOverdue.filter(t => t.priority === 'Low');
 
-	appendTasksTo(highList, high);
-	appendTasksTo(medList, med);
-	appendTasksTo(lowList, low);
-	appendTasksTo(overdueList, overdueArr, 'Good job! You have no overdue! 🥳');
+  appendTasksTo(highList, high);
+  appendTasksTo(medList, med);
+  appendTasksTo(lowList, low);
+  appendTasksTo(overdueList, overdueArr, 'Good job! You have no overdue! 🥳');
 }
 
 function appendTasksTo(container, arr, emptyMessage = 'No tasks yet!') {
-  if (!arr.length) {
+  if (!container) {
+    console.warn('appendTasksTo: missing container', container, arr);
+    return;
+  }
+
+  if (!arr || arr.length === 0) {
     const e = document.createElement('div');
     e.className = 'empty';
     e.textContent = emptyMessage;
     container.appendChild(e);
     return;
-}
-	  arr.forEach(t=>{
-    const node = taskTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector('.task-title').textContent = t.title;
+  }
+
+  const tpl = taskTemplateEl;
+  if (!tpl || !tpl.content) {
+    console.error('task template missing: #task-template — cannot render tasks');
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = 'Task template missing';
+    container.appendChild(e);
+    return;
+  }
+
+  arr.forEach(t=>{
+    const node = tpl.content.firstElementChild.cloneNode(true);
+    const titleEl = node.querySelector('.task-title');
+    if (titleEl) titleEl.textContent = t.title || 'Untitled';
+    const metaEl = node.querySelector('.task-meta');
     const metaParts = [];
     if(t.due) metaParts.push(formatDueForDisplay(t.due));
-    if (t.duration != null) metaParts.push(`${t.duration} Hours`);
-    node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
+    if (t.duration != null && t.duration !== 0) metaParts.push(`${t.duration} Hours`);
+    if (metaEl) metaEl.innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
 
-    // mark priority as before
     node.setAttribute('data-priority', t.priority || 'Medium');
 
-    // overdue logic 
     const overdue = isOverdue(t);
     if (overdue) {
       node.classList.add('overdue');
@@ -210,13 +239,17 @@ function appendTasksTo(container, arr, emptyMessage = 'No tasks yet!') {
       node.classList.remove('overdue');
     }
 
-    // done button
     const doneBtn = node.querySelector('.done-btn');
-    doneBtn.textContent = t.done ? 'Undo' : 'Done';
-    doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
+    if (doneBtn) {
+      doneBtn.textContent = t.done ? 'Undo' : 'Done';
+      doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
+    }
 
-    node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
-    node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
+    const editBtn = node.querySelector('.edit-btn');
+    if (editBtn) editBtn.onclick = ()=> openEdit(t);
+
+    const delBtn = node.querySelector('.del-btn');
+    if (delBtn) delBtn.onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
 
     try {
       const actions = node.querySelector('.task-actions');
@@ -228,23 +261,21 @@ function appendTasksTo(container, arr, emptyMessage = 'No tasks yet!') {
         calBtn.setAttribute('rel','noopener noreferrer');
         calBtn.textContent = 'Add to Calendar';
 
-        // build google calendar link
         const dates = googleDatesRangeForTask(t.due);
         if (dates) {
           const params = new URLSearchParams();
-          params.set('action','TEMPLATE'); // some browsers prefer this in path but this works
+          params.set('action','TEMPLATE');
           params.set('text', t.title || 'Task');
           if (t.notes) params.set('details', t.notes);
           params.set('dates', dates);
-          const href = 'https://calendar.google.com/calendar/render?' + params.toString();
-          calBtn.href = href;
+          calBtn.href = 'https://calendar.google.com/calendar/render?' + params.toString();
         } else {
           calBtn.href = '#';
           calBtn.addEventListener('click', (ev) => { ev.preventDefault(); showToast('Task has no due date to add to calendar', 'info'); });
         }
 
-        const editBtn = node.querySelector('.edit-btn');
-        if (editBtn) actions.insertBefore(calBtn, editBtn);
+        const editBtnLocal = node.querySelector('.edit-btn');
+        if (editBtnLocal) actions.insertBefore(calBtn, editBtnLocal);
         else actions.appendChild(calBtn);
       }
     } catch(err) {
@@ -275,11 +306,10 @@ function googleDatesRangeForTask(dueStr) {
     const d = parse(dueStr);
     if (!d) return null;
     const toUTCString = dt => {
-      // YYYYMMDDTHHMMSSZ (UTC)
       return dt.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
     };
     const start = toUTCString(d);
-    const end = toUTCString(new Date(d.getTime() + 60 * 60 * 1000)); // +1 hour
+    const end = toUTCString(new Date(d.getTime() + 60 * 60 * 1000));
     return `${start}/${end}`;
   }
 }
@@ -355,24 +385,26 @@ async function loadProfileFromDb(uid){
 
 function applyDisplayNameToUI(name){
   if(!name) return;
-  guestNote.style.display = 'none';
-  userEmail.style.display = 'block';
-  userEmail.textContent = name;
-  $('greeting').textContent = `Welcome, ${name.split(' ')[0] || name}! 😌`;
+  const gn = $('guest-note');
+  if (gn) gn.style.display = 'none';
+  const ue = $('user-email');
+  if (ue) { ue.style.display = 'block'; ue.textContent = name; }
+  const g = $('greeting');
+  if (g) g.textContent = `Welcome, ${name.split(' ')[0] || name}! 😌`;
 }
 
 function updateAuthUIOnState(signedIn){
   if(signedIn){
-    authButtons.style.display = 'none';
-    accountBtn.style.display = 'inline-block';
+    if (authButtons) authButtons.style.display = 'none';
+    if (accountBtn) accountBtn.style.display = 'inline-block';
   } else {
-    authButtons.style.display = 'flex';
-    accountBtn.style.display = 'none';
+    if (authButtons) authButtons.style.display = 'flex';
+    if (accountBtn) accountBtn.style.display = 'none';
   }
 }
 
 /* Google login */
-googleBtn.addEventListener('click', async ()=>{
+if (googleBtn) googleBtn.addEventListener('click', async ()=>{
   try {
     await signInWithPopup(auth, provider);
     showToast('Signed in with Google', 'success');
@@ -382,19 +414,20 @@ googleBtn.addEventListener('click', async ()=>{
   }
 });
 
-emailSigninBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signin'); });
-emailSignupBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signup'); });
-accountBtn.addEventListener('click', ()=> { showPage('profile'); });
+if (emailSigninBtn) emailSigninBtn.addEventListener('click', ()=> { showPage('profile'); /* showEmailForms('signin'); */ showEmailForms('signin'); });
+if (emailSignupBtn) emailSignupBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signup'); });
+if (accountBtn) accountBtn.addEventListener('click', ()=> { showPage('profile'); });
 
 function showEmailForms(mode){
-  profileSignedOut.style.display = '';
-  profileSignedIn.style.display = 'none';
-  if(mode === 'signin') signinEmail.focus(); else signupEmail.focus();
-  signinStatus.textContent = ''; signupStatus.textContent = '';
+  if (profileSignedOut) profileSignedOut.style.display = '';
+  if (profileSignedIn) profileSignedIn.style.display = 'none';
+  if(mode === 'signin' && signinEmail) signinEmail.focus();
+  else if (signupEmail) signupEmail.focus();
+  if (signinStatus) signinStatus.textContent = ''; if (signupStatus) signupStatus.textContent = '';
 }
 
 /* sign-up */
-signupSubmit.addEventListener('click', async ()=>{
+if (signupSubmit) signupSubmit.addEventListener('click', async ()=>{
   const em = signupEmail.value && signupEmail.value.trim();
   const p1 = signupPassword.value;
   const p2 = signupConfirm.value;
@@ -408,7 +441,6 @@ signupSubmit.addEventListener('click', async ()=>{
       await sendEmailVerification(cred.user);
       signupStatus.textContent = 'Account created — verification email sent. Please check your inbox.';
       showToast('Verification email sent', 'success');
-      // sign out to force verification flow (optional). We'll sign out to enforce verification.
       try { await signOut(auth); } catch(e){/*ignore*/ }
     } catch(sendErr){
       console.warn('verification send failed', sendErr);
@@ -423,7 +455,7 @@ signupSubmit.addEventListener('click', async ()=>{
 });
 
 /* sign-in */
-signinSubmit.addEventListener('click', async ()=>{
+if (signinSubmit) signinSubmit.addEventListener('click', async ()=>{
   const em = signinEmail.value && signinEmail.value.trim();
   const p = signinPassword.value;
   signinStatus.textContent = '';
@@ -444,14 +476,13 @@ signinSubmit.addEventListener('click', async ()=>{
 });
 
 /* sign-out */
-signoutBtn.addEventListener('click', async ()=>{
+if (signoutBtn) signoutBtn.addEventListener('click', async ()=>{
   try {
     await signOut(auth);
     showToast('Signed out', 'info');
   } catch(e){ console.warn(e); showToast('Sign-out failed', 'error'); }
 });
 
-/* resend verification helper (exposed to profile UI via warning area) */
 async function resendVerification(){
   if(!auth.currentUser) return showToast('Not signed in', 'error');
   if(resendCooldown) return showToast('Please wait before resending', 'info');
@@ -459,14 +490,13 @@ async function resendVerification(){
     await sendEmailVerification(auth.currentUser);
     showToast('Verification email resent', 'success');
     resendCooldown = true;
-    setTimeout(()=> { resendCooldown = false; }, 45_000); // 45s cooldown
+    setTimeout(()=> { resendCooldown = false; }, 45_000);
   } catch(e){
     console.error('resend failed', e);
     showToast('Failed to resend verification', 'error');
   }
 }
 
-/* re-check verification email */
 async function checkVerifiedNow(){
   if(!auth.currentUser) return;
   try {
@@ -481,10 +511,10 @@ async function checkVerifiedNow(){
 }
 
 function updateAfterVerified(){
-  verifiedWarning.style.display = 'none';
+  const vw = $('verified-warning');
+  if (vw) vw.style.display = 'none';
   if(currentUser && currentUser.emailVerified){
-    if(tasks && tasks.length) pushTasksToRemote();
-    else pushTasksToRemote();
+    pushTasksToRemote();
     showToast('Syncing tasks to remote', 'info');
   }
 }
@@ -528,31 +558,27 @@ onAuthStateChanged(auth, async user => {
   currentUser = user;
   if(user){
     updateAuthUIOnState(true);
-    guestNote.style.display = 'none';
-    profileSignedOut.style.display = 'none';
-    profileSignedIn.style.display = '';
+    const gn = $('guest-note'); if (gn) gn.style.display = 'none';
+    if (profileSignedOut) profileSignedOut.style.display = 'none';
+    if (profileSignedIn) profileSignedIn.style.display = '';
 
-    // apply name/email
     const nameFromAuth = user.displayName || null;
-    userEmail.style.display = 'block';
-    userEmail.textContent = nameFromAuth || user.email || 'Signed in';
-    profileEmail.textContent = user.email || '';
-    profileUid.textContent = user.uid || '';
-    accountBtn.style.display = 'inline-block';
+    const ue = $('user-email'); if (ue) { ue.style.display = 'block'; ue.textContent = nameFromAuth || user.email || 'Signed in'; }
+    if (profileEmail) profileEmail.textContent = user.email || '';
+    if (profileUid) profileUid.textContent = user.uid || '';
+    if (accountBtn) accountBtn.style.display = 'inline-block';
 
-    // prefill profile name
     if(nameFromAuth){
-      profileNameInput.value = nameFromAuth;
+      if (profileNameInput) profileNameInput.value = nameFromAuth;
       applyDisplayNameToUI(nameFromAuth);
     } else {
       const p = await loadProfileFromDb(user.uid);
-      profileNameInput.value = (p && p.displayName) || '';
-      if(profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
+      if (profileNameInput) profileNameInput.value = (p && p.displayName) || '';
+      if(profileNameInput && profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
     }
 
     if(!user.emailVerified && user.providerData && user.providerData.some(pd=>pd.providerId === 'password')){
-      verifiedWarning.style.display = '';
-      verifiedWarning.innerHTML = `Your email is not verified. <button id="resend-verify" class="btn ghost small">Resend verification</button> <button id="check-verified" class="btn small">I verified</button>`;
+      const vw = $('verified-warning'); if (vw) { vw.style.display = ''; vw.innerHTML = `Your email is not verified. <button id="resend-verify" class="btn ghost small">Resend verification</button> <button id="check-verified" class="btn small">I verified</button>`; }
       setTimeout(()=>{
         const r = $('resend-verify'), c = $('check-verified');
         if(r) r.addEventListener('click', ()=> resendVerification());
@@ -560,104 +586,128 @@ onAuthStateChanged(auth, async user => {
       }, 60);
       showToast('You must verify your email to enable full sync', 'info', 5000);
     } else {
-      verifiedWarning.style.display = 'none';
+      const vw = $('verified-warning'); if (vw) vw.style.display = 'none';
     }
 
     await mergeOnSignin(user.uid);
-    const rref = ref(db, `users/${user.uid}/tasks`);
-    onValue(rref, snap => {
-      const v = snap.val();
-      if(!v){
-        if(tasks && tasks.length) pushTasksToRemote();
-        return;
-      }
-      const arr = Object.keys(v).map(k => { const it = v[k]; it.id = k; return it; });
-      tasks = arr;
-      saveLocal();
-      render();
-    }, err => console.warn('remote onValue err', err));
+    try {
+      const rref = ref(db, `users/${user.uid}/tasks`);
+      onValue(rref, snap => {
+        const v = snap.val();
+        if(!v){
+          if(tasks && tasks.length) pushTasksToRemote();
+          return;
+        }
+        const arr = Object.keys(v).map(k => { const it = v[k]; it.id = k; return it; });
+        tasks = arr;
+        saveLocal();
+        render();
+      }, err => console.warn('remote onValue err', err));
+    } catch(e){
+      console.warn('onValue listen failed', e);
+    }
   } else {
     updateAuthUIOnState(false);
-    guestNote.style.display = '';
-    userEmail.style.display = 'none';
-    accountBtn.style.display = 'none';
-    profileSignedOut.style.display = '';
-    profileSignedIn.style.display = 'none';
-    profileEmail.textContent = ''; profileUid.textContent = ''; profileNameInput.value = '';
-    $('greeting').textContent = 'Welcome! 😌';
+    const gn = $('guest-note'); if (gn) gn.style.display = '';
+    const ue = $('user-email'); if (ue) ue.style.display = 'none';
+    if (accountBtn) accountBtn.style.display = 'none';
+    if (profileSignedOut) profileSignedOut.style.display = '';
+    if (profileSignedIn) profileSignedIn.style.display = 'none';
+    if (profileEmail) profileEmail.textContent = ''; if (profileUid) profileUid.textContent = ''; if (profileNameInput) profileNameInput.value = '';
+    const g = $('greeting'); if (g) g.textContent = 'Welcome! 😌';
     loadLocal(); render();
   }
 });
 
-navHome.addEventListener('click', ()=> showPage('home'));
-navAdd.addEventListener('click', ()=> showPage('add'));
-navProfile.addEventListener('click', ()=> showPage('profile'));
-function setActiveNav(id){ [navHome,navAdd,navProfile].forEach(n=>n.classList.remove('active')); if(id==='home') navHome.classList.add('active'); if(id==='add') navAdd.classList.add('active'); if(id==='profile') navProfile.classList.add('active'); }
+if (navHome) navHome.addEventListener('click', ()=> showPage('home'));
+if (navAdd) navAdd.addEventListener('click', ()=> showPage('add'));
+if (navProfile) navProfile.addEventListener('click', ()=> showPage('profile'));
+
+function setActiveNav(id){
+  const ids = [navHome, navAdd, navProfile];
+  ids.forEach(n => { if(n) n.classList && n.classList.remove('active'); });
+  if (id === 'home' && navHome) navHome.classList.add('active');
+  if (id === 'add' && navAdd) navAdd.classList.add('active');
+  if (id === 'profile' && navProfile) navProfile.classList.add('active');
+}
+
 function showPage(name){
-  pageHome.style.display = name==='home' ? '' : 'none';
-  pageAdd.style.display = name==='add' ? '' : 'none';
-  pageProfile.style.display = name==='profile' ? '' : 'none';
+  const pages = { home:'page-home', add:'page-add', profile:'page-profile' };
+  Object.keys(pages).forEach(k=>{
+    const el = $(pages[k]);
+    if (!el) return;
+    el.style.display = (k === name) ? '' : 'none';
+  });
   setActiveNav(name);
 }
-if (backHomeBtn) {
-  backHomeBtn.addEventListener('click', ()=> showPage('home'));
-}
-navHome.click();
 
-saveTaskBtn.addEventListener('click', ()=>{
+if (backHomeBtn) backHomeBtn.addEventListener('click', ()=> showPage('home'));
+if (navHome && !navHome.classList.contains('active')) navHome.click();
+
+/* Save / cancel */
+if (saveTaskBtn) saveTaskBtn.addEventListener('click', ()=>{
   if(currentUser && currentUser.providerData && currentUser.providerData.some(pd=>pd.providerId === 'password') && !currentUser.emailVerified){
     showToast('Verify your email to add tasks (or sign in via Google).', 'error');
     return;
   }
-  const title = taskTitle.value && taskTitle.value.trim();
+  const title = taskTitle && taskTitle.value && taskTitle.value.trim();
   if(!title) return showToast('Please give the task a name', 'error');
-  const d = taskDate.value || null; const t = taskTime.value || null; let due = null; if(d && t) due = d + 'T' + t; else if(d) due = d;
-  const rawDur = taskDuration.value;
+  const d = (taskDate && taskDate.value) || null;
+  const t = (taskTime && taskTime.value) || null;
+  let due = null; if(d && t) due = d + 'T' + t; else if(d) due = d;
+  const rawDur = (document.getElementById('task-duration') && document.getElementById('task-duration').value) || '';
   const durNum = rawDur === '' ? null : Number(rawDur);
-  const duration = (durNum === 0) ? null : durNum; // treat 0 as "no value"
+  const duration = (durNum === 0) ? null : durNum;
 
   const item = {
     title,
-    notes: taskNotes.value.trim() || '',
+    notes: (taskNotes && taskNotes.value && taskNotes.value.trim()) || '',
     due,
-    priority: taskPriority.value,
+    priority: (taskPriority && taskPriority.value) || 'Medium',
     duration,
-    reminder: !!taskReminder.checked,
+    reminder: !!(taskReminder && taskReminder.checked),
     done: false
   };
-  // ===================================================================================
 
   addTaskLocal(item);
-  taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value='0'; taskReminder.checked=false;
+  if (taskTitle) taskTitle.value=''; if (taskNotes) taskNotes.value=''; if (taskDate) taskDate.value=''; if (taskTime) taskTime.value=''; if (taskPriority) taskPriority.value='Medium';
+  const durEl = document.getElementById('task-duration'); if (durEl) durEl.value='0';
+  if (taskReminder) taskReminder.checked=false;
   showPage('home');
   showToast('Task added', 'success');
 });
 
-cancelTaskBtn.addEventListener('click', ()=> { taskTitle.value=''; taskNotes.value=''; taskDate.value=''; taskTime.value=''; taskPriority.value='Medium'; taskDuration.value='0'; taskReminder.checked=false; showPage('home'); });
+if (cancelTaskBtn) cancelTaskBtn.addEventListener('click', ()=> {
+  if (taskTitle) taskTitle.value=''; if (taskNotes) taskNotes.value=''; if (taskDate) taskDate.value=''; if (taskTime) taskTime.value=''; if (taskPriority) taskPriority.value='Medium';
+  const durEl = document.getElementById('task-duration'); if (durEl) durEl.value='0';
+  if (taskReminder) taskReminder.checked=false;
+  showPage('home');
+});
 
-clearLocalBtn.addEventListener('click', ()=> { if(confirm('Clear local tasks and push empty to remote (if signed in)?')){ tasks=[]; dispatchChange(); render(); if(currentUser && currentUser.emailVerified) pushTasksToRemote(); } });
+if (clearLocalBtn) clearLocalBtn.addEventListener('click', ()=> {
+  if(confirm('Clear local tasks and push empty to remote (if signed in)?')){ tasks=[]; dispatchChange(); render(); if(currentUser && currentUser.emailVerified) pushTasksToRemote(); }
+});
 
-sortMode.addEventListener('change', render);
-showComplete.addEventListener('change', render);
+if (sortMode) sortMode.addEventListener('change', render);
+if (showComplete) showComplete.addEventListener('change', render);
 
-/* profile save */
-saveNameBtn.addEventListener('click', async ()=>{
-  const name = profileNameInput.value && profileNameInput.value.trim();
+if (saveNameBtn) saveNameBtn.addEventListener('click', async ()=>{
+  const name = profileNameInput && profileNameInput.value && profileNameInput.value.trim();
   if(!name) return showToast('Enter a display name', 'error');
   if(!currentUser) return showToast('Sign in first to save a profile name', 'error');
   await saveDisplayName(name);
 });
-refreshProfileBtn.addEventListener('click', async ()=>{
+if (refreshProfileBtn) refreshProfileBtn.addEventListener('click', async ()=>{
   if(!currentUser) return;
   const authName = currentUser.displayName || '';
   const dbProfile = await loadProfileFromDb(currentUser.uid);
-  profileNameInput.value = authName || (dbProfile && dbProfile.displayName) || '';
-  if(profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
+  if (profileNameInput) profileNameInput.value = authName || (dbProfile && dbProfile.displayName) || '';
+  if(profileNameInput && profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
 });
 
-/* form cancel buttons */
-$('signin-cancel')?.addEventListener('click', ()=> { signinEmail.value=''; signinPassword.value=''; signinStatus.textContent=''; });
-$('signup-cancel')?.addEventListener('click', ()=> { signupEmail.value=''; signupPassword.value=''; signupConfirm.value=''; signupStatus.textContent=''; });
+/* form cancel */
+$('signin-cancel')?.addEventListener('click', ()=> { if (signinEmail) signinEmail.value=''; if (signinPassword) signinPassword.value=''; if (signinStatus) signinStatus.textContent=''; });
+$('signup-cancel')?.addEventListener('click', ()=> { if (signupEmail) signupEmail.value=''; if (signupPassword) signupPassword.value=''; if (signupConfirm) signupConfirm.value=''; if (signupStatus) signupStatus.textContent=''; });
 
 /* initial load */
 loadLocal(); render();
@@ -669,14 +719,13 @@ if ('serviceWorker' in navigator) {
   }).catch(err => console.warn('sw reg failed', err));
 }
 
-// helper 
+// helper / notifications
 async function requestNotificationPermission() {
   if (!('Notification' in window)) return false;
   const perm = await Notification.requestPermission();
   return perm === 'granted';
 }
 
-// notification 
 async function showNotificationNow(title, options = {}) {
   if (navigator.serviceWorker && navigator.serviceWorker.ready) {
     const reg = await navigator.serviceWorker.ready;
