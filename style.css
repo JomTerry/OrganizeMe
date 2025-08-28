@@ -246,11 +246,14 @@ button{font:inherit}
 }
 
 /* Overdue visual for the pasaway 💀 */
-:root{
-  --overdue-accent: #6b1212;
-  --overdue-bg: linear-gradient(90deg, rgba(107,18,18,0.08), rgba(255,242,242,0.05));
+:root {
+  --overdue-accent: #8b0000;
+  --overdue-bg: linear-gradient(
+    90deg,
+    rgba(139, 0, 0, 0.15),
+    rgba(255, 230, 230, 0.08)
+  );
 }
-
 #overdue-list .task,
 .task.overdue {
   border-left: 6px solid var(--overdue-accent) !important;
@@ -271,10 +274,11 @@ button{font:inherit}
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: center; 
 }
-
 .task-actions .btn {
   flex: 1;
+  max-width: 90px; 
 }
   .task-actions .btn {
   flex: 1;
@@ -315,7 +319,7 @@ button{font:inherit}
 
 #overdue-list .task .btn:hover,
 .task.overdue .btn:hover {
-  filter: brightness(0.95);
+  filter: brightness(1.05);
 }
 
 .task-actions .btn:focus {
