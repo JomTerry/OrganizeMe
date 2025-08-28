@@ -22,7 +22,6 @@ import {
   	child
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-/* ========== CONFIG - replace if you wish ========== */
 const firebaseConfig = {
   apiKey: "AIzaSyBWawjroPfOoWvUz4VKstv8gn3UYVpLgC4",
   authDomain: "jomterryy417-c0c.firebaseapp.com",
@@ -38,7 +37,6 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getDatabase(app);
 
-/* ========== Small UI helpers ========== */
 const $ = id => document.getElementById(id);
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function nowISO(){ return new Date().toISOString(); }
@@ -57,14 +55,12 @@ function showToast(msg, type='info', ms=3000){
   toastTimer = setTimeout(()=> { toastEl.style.opacity = '0'; }, ms);
 }
 
-/* ========== STATE & DOM refs ========== */
 const STORAGE_KEY = 'organizeMe.tasks.v2';
 let tasks = [];
 let currentUser = null;
 let syncTimeout = null;
 let resendCooldown = false;
 
-/* DOM refs */
 const pageHome = $('page-home'), pageAdd = $('page-add'), pageProfile = $('page-profile');
 const navHome = $('nav-home'), navAdd = $('nav-add'), navProfile = $('nav-profile');
 const highList = $('high-list'), medList = $('med-list'), lowList = $('low-list'), overdueList = $('overdue-list');
@@ -87,7 +83,8 @@ const signinForm = $('form-signin'), signupForm = $('form-signup');
 const signinEmail = $('signin-email'), signinPassword = $('signin-password'), signinStatus = $('signin-status'), signinSubmit = $('signin-submit');
 const signupEmail = $('signup-email'), signupPassword = $('signup-password'), signupConfirm = $('signup-confirm'), signupStatus = $('signup-status'), signupSubmit = $('signup-submit');
 const taskTemplate = $('task-template');
-// select 0-1000 (shows a wheel on mobile)
+
+// select 0-1000 
 (function replaceDurationWithSelect(maxValue = 1000) {
   const old = document.getElementById('task-duration');
   if (!old) return;
@@ -98,7 +95,6 @@ const taskTemplate = $('task-template');
   sel.className = old.className || '';
   sel.setAttribute('aria-label', 'Estimated duration (hours)');
 
-  // populate 0..maxValue
   for (let i = 0; i <= maxValue; i++) {
     const opt = document.createElement('option');
     opt.value = String(i);
@@ -106,7 +102,6 @@ const taskTemplate = $('task-template');
     sel.appendChild(opt);
   }
 
-  // replace old input with the new select in DOM
   old.parentNode.replaceChild(sel, old);
 })(1000);
 
@@ -132,16 +127,13 @@ function dispatchChange() {
 /* Render logic */
 function render() {
   const showCompleted = showComplete.checked;
-  // base visible set (respect show-complete)
+
   let baseVisible = tasks.filter(t => showCompleted ? true : !t.done);
 
-  // compute overdue separately (not done & due < now)
   const overdueArr = baseVisible.filter(t => isOverdue(t));
 
-  // remove overdue from baseVisible so they don't show in priority lists
   const nonOverdue = baseVisible.filter(t => !isOverdue(t));
 
-  // sorting logic applied to nonOverdue (as before)
   if (sortMode.value === 'date') {
     nonOverdue.sort((a,b) => {
       const da = parseDueToDate(a.due), db = parseDueToDate(b.due);
@@ -183,17 +175,21 @@ function render() {
   const med  = nonOverdue.filter(t => t.priority === 'Medium');
   const low  = nonOverdue.filter(t => t.priority === 'Low');
 
-  appendTasksTo(highList, high);
-  appendTasksTo(medList, med);
-  appendTasksTo(lowList, low);
-  appendTasksTo(overdueList, overdueArr);
+	appendTasksTo(highList, high);
+	appendTasksTo(medList, med);
+	appendTasksTo(lowList, low);
+	appendTasksTo(overdueList, overdueArr, 'Good job! You have no overdue! 🥳');
 }
 
-function appendTasksTo(container, arr){
-  if(!arr.length){
-    const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No tasks yet!'; container.appendChild(e); return;
-  }
-  arr.forEach(t=>{
+function appendTasksTo(container, arr, emptyMessage = 'No tasks yet!') {
+  if (!arr.length) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = emptyMessage;
+    container.appendChild(e);
+    return;
+}
+	  arr.forEach(t=>{
     const node = taskTemplate.content.firstElementChild.cloneNode(true);
     node.querySelector('.task-title').textContent = t.title;
     const metaParts = [];
@@ -204,7 +200,7 @@ function appendTasksTo(container, arr){
     // mark priority as before
     node.setAttribute('data-priority', t.priority || 'Medium');
 
-    // === overdue logic ===
+    // overdue logic 
     const overdue = isOverdue(t);
     if (overdue) {
       node.classList.add('overdue');
@@ -219,15 +215,12 @@ function appendTasksTo(container, arr){
     doneBtn.textContent = t.done ? 'Undo' : 'Done';
     doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
 
-    // Edit / Delete wiring
     node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
     node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
 
-    // === Add-to-Calendar button (insert before edit button) ===
     try {
       const actions = node.querySelector('.task-actions');
       if (actions) {
-        // create button element
         const calBtn = document.createElement('a');
         calBtn.className = 'btn ghost small cal-btn';
         calBtn.setAttribute('role','button');
@@ -250,13 +243,11 @@ function appendTasksTo(container, arr){
           calBtn.addEventListener('click', (ev) => { ev.preventDefault(); showToast('Task has no due date to add to calendar', 'info'); });
         }
 
-        // insert before edit button (if found) otherwise append
         const editBtn = node.querySelector('.edit-btn');
         if (editBtn) actions.insertBefore(calBtn, editBtn);
         else actions.appendChild(calBtn);
       }
     } catch(err) {
-      // don't break the rendering if calendar part fails
       console.warn('failed to add calendar button', err);
     }
 
@@ -264,10 +255,8 @@ function appendTasksTo(container, arr){
   });
 }
 
-// ------- helpers for overdue + calendar --------
 function isOverdue(task) {
   if (!task || !task.due) return false;
-  // parseDueToDate already treats YYYY-MM-DD as end-of-day
   const d = parseDueToDate(task.due);
   if (!d) return false;
   return d.getTime() < Date.now() && !task.done;
@@ -278,13 +267,11 @@ function googleDatesRangeForTask(dueStr) {
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(dueStr);
   const parse = parseDueToDate;
   if (isDateOnly) {
-    // all-day event: start = date, end = next day (Google expects end exclusive)
     const start = new Date(dueStr + 'T00:00:00');
     const end = new Date(start.getTime() + 1000 * 60 * 60 * 24);
     const fmt = dt => dt.toISOString().slice(0,10).replace(/-/g,'');
     return `${fmt(start)}/${fmt(end)}`;
   } else {
-    // timed event: use the provided datetime; default duration 1 hour
     const d = parse(dueStr);
     if (!d) return null;
     const toUTCString = dt => {
@@ -299,7 +286,6 @@ function googleDatesRangeForTask(dueStr) {
 
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ========== Task actions ========== */
 function addTaskLocal(data){
   const t = { id: data.id || uid(), title: data.title || 'Untitled', notes: data.notes||'', due: data.due||null, priority: data.priority||'Medium', duration: data.duration||null, reminder: !!data.reminder, done: !!data.done, createdAt: data.createdAt || nowISO() };
   tasks.push(t); dispatchChange(); render(); return t;
@@ -314,7 +300,6 @@ function openEdit(t){
 
 function clearAllLocal(){ if(!confirm('Clear all tasks locally?')) return; tasks = []; dispatchChange(); render(); }
 
-/* ========== Remote sync (Realtime DB) ========== */
 async function pushTasksToRemote(){
   if(!currentUser) return;
   if(!currentUser.emailVerified){
@@ -343,7 +328,6 @@ async function mergeOnSignin(uid){
   } catch(e){ console.warn('mergeOnSignin err', e); }
 }
 
-/* ========== Profile helpers ========== */
 async function saveDisplayName(name){
   if(!currentUser) return;
   profileSaveStatus.textContent = 'Saving...';
@@ -377,9 +361,6 @@ function applyDisplayNameToUI(name){
   $('greeting').textContent = `Welcome, ${name.split(' ')[0] || name}! 😌`;
 }
 
-/* ========== AUTH flows ========== */
-
-/* toggle header auth buttons visibility */
 function updateAuthUIOnState(signedIn){
   if(signedIn){
     authButtons.style.display = 'none';
@@ -401,7 +382,6 @@ googleBtn.addEventListener('click', async ()=>{
   }
 });
 
-/* header email buttons: show profile page and forms */
 emailSigninBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signin'); });
 emailSignupBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signup'); });
 accountBtn.addEventListener('click', ()=> { showPage('profile'); });
@@ -486,7 +466,7 @@ async function resendVerification(){
   }
 }
 
-/* helper to re-check verification after user clicked email */
+/* re-check verification email */
 async function checkVerifiedNow(){
   if(!auth.currentUser) return;
   try {
@@ -500,24 +480,16 @@ async function checkVerifiedNow(){
   } catch(e){ console.warn(e); showToast('Verification check failed', 'error'); }
 }
 
-/* called when a user becomes verified */
 function updateAfterVerified(){
   verifiedWarning.style.display = 'none';
-  // If we have a currentUser now verified, ensure push/subscribe
   if(currentUser && currentUser.emailVerified){
-    // push local tasks to remote so other devices receive them
     if(tasks && tasks.length) pushTasksToRemote();
     else pushTasksToRemote();
     showToast('Syncing tasks to remote', 'info');
   }
 }
 
-/* ===========================
-   Password visibility toggles
-   =========================== */
-// Wire up any .pw-toggle buttons present in DOM
 document.addEventListener('click', (e) => {
-  // Delegation: if a pw-toggle was clicked
   const btn = e.target.closest && e.target.closest('.pw-toggle');
   if (!btn) return;
   const targetId = btn.dataset && btn.dataset.target;
@@ -527,28 +499,21 @@ document.addEventListener('click', (e) => {
   const isHidden = input.type === 'password';
   input.type = isHidden ? 'text' : 'password';
   btn.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
-  // optional: change inner icon to eye/eye-off - here we just flip color via aria-pressed
   input.focus();
 });
 
-/* ===========================
-   Forgot / reset password
-   =========================== */
 const signinForgotEl = $('signin-forgot');
 if (signinForgotEl) {
   signinForgotEl.addEventListener('click', async (ev) => {
     ev.preventDefault();
-    // prefer the email typed into the signin box
     let email = (signinEmail && signinEmail.value && signinEmail.value.trim()) || '';
     if (!email) {
-      // prompt if empty
       email = prompt('Enter the email to send password reset to:');
       if (!email) return;
     }
     try {
       await sendPasswordResetEmail(auth, email);
       showToast('Password reset email sent — check your inbox', 'success', 6000);
-      // give a visible confirmation near signin status (if shown)
       if (signinStatus) signinStatus.textContent = 'Password reset email sent. Check inbox.';
     } catch (err) {
       console.error('sendPasswordResetEmail failed', err);
@@ -559,11 +524,9 @@ if (signinForgotEl) {
   });
 }
 
-/* Listen to auth state changes */
 onAuthStateChanged(auth, async user => {
   currentUser = user;
   if(user){
-    // update header/profile UI
     updateAuthUIOnState(true);
     guestNote.style.display = 'none';
     profileSignedOut.style.display = 'none';
@@ -587,11 +550,9 @@ onAuthStateChanged(auth, async user => {
       if(profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
     }
 
-    // If the user is not verified (email provider), block certain actions
     if(!user.emailVerified && user.providerData && user.providerData.some(pd=>pd.providerId === 'password')){
       verifiedWarning.style.display = '';
       verifiedWarning.innerHTML = `Your email is not verified. <button id="resend-verify" class="btn ghost small">Resend verification</button> <button id="check-verified" class="btn small">I verified</button>`;
-      // wire those dynamically created buttons:
       setTimeout(()=>{
         const r = $('resend-verify'), c = $('check-verified');
         if(r) r.addEventListener('click', ()=> resendVerification());
@@ -602,7 +563,6 @@ onAuthStateChanged(auth, async user => {
       verifiedWarning.style.display = 'none';
     }
 
-    // Merge tasks and subscribe remote -> local updates
     await mergeOnSignin(user.uid);
     const rref = ref(db, `users/${user.uid}/tasks`);
     onValue(rref, snap => {
@@ -617,7 +577,6 @@ onAuthStateChanged(auth, async user => {
       render();
     }, err => console.warn('remote onValue err', err));
   } else {
-    // signed out -> show local-only UI
     updateAuthUIOnState(false);
     guestNote.style.display = '';
     userEmail.style.display = 'none';
@@ -630,7 +589,6 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
-/* ========== Navigation + UI wiring ========== */
 navHome.addEventListener('click', ()=> showPage('home'));
 navAdd.addEventListener('click', ()=> showPage('add'));
 navProfile.addEventListener('click', ()=> showPage('profile'));
@@ -646,7 +604,6 @@ if (backHomeBtn) {
 }
 navHome.click();
 
-/* Add task form */
 saveTaskBtn.addEventListener('click', ()=>{
   if(currentUser && currentUser.providerData && currentUser.providerData.some(pd=>pd.providerId === 'password') && !currentUser.emailVerified){
     showToast('Verify your email to add tasks (or sign in via Google).', 'error');
