@@ -1,4 +1,4 @@
-// index.js (module) - patched to be robust to missing DOM and to run after DOMContentLoaded
+// index.js (module) - robust + diagnostic + auto-inject fallback for Add/Profile
 // Firebase web SDK v10 imports
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
@@ -31,52 +31,199 @@ const firebaseConfig = {
   appId: "1:993273611189:web:baba2cdc4ff30682904ffc",
   databaseURL: "https://jomterryy417-c0c-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getDatabase(app);
 
-/*
-  SAFETY: Wrap most initialization in DOMContentLoaded so the script works
-  whether index.js is loaded in head or at the end of the body.
-  Also guard element access and listeners with `if (el)` checks so missing
-  IDs won't throw and abort the script (which produced the blank pages).
-*/
+const $ = id => document.getElementById(id);
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function nowISO(){ return new Date().toISOString(); }
+function parseDueToDate(d){ if(!d) return null; if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d+'T23:59:59'); return new Date(d); }
+function formatDueForDisplay(s){ if(!s) return ''; if(s.includes('T')) return s.replace('T',' '); return s; }
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function createAddPageFallback(containerId = 'page-add') {
+  const container = document.getElementById(containerId);
+  if (!container) return null;
+  if (container.innerHTML.trim() !== '') return container; // already has content
+  const frag = document.createDocumentFragment();
+
+  const card = document.createElement('div');
+  card.className = 'card form-card';
+  card.innerHTML = `
+    <h3 class="section-title">Add task</h3>
+    <div class="row" style="flex-direction:column;gap:8px">
+      <label>Title
+        <input id="task-title" type="text" />
+      </label>
+      <label>Notes
+        <textarea id="task-notes" rows="3"></textarea>
+      </label>
+      <div class="row">
+        <label style="flex:1">Due date
+          <input id="task-date" type="date" />
+        </label>
+        <label style="flex:1">Time
+          <input id="task-time" type="time" />
+        </label>
+      </div>
+      <div class="row">
+        <label style="flex:1">Priority
+          <select id="task-priority">
+            <option>Medium</option>
+            <option>High</option>
+            <option>Low</option>
+          </select>
+        </label>
+        <label style="flex:1">Duration
+          <select id="task-duration"></select>
+        </label>
+      </div>
+      <label class="row toggle-row">
+        <span>Reminder</span>
+        <input id="task-reminder" type="checkbox" />
+      </label>
+      <div class="row gap">
+        <button id="save-task" class="btn">Save</button>
+        <button id="cancel-task" class="btn ghost">Cancel</button>
+        <button id="back-home" class="btn ghost">Back</button>
+      </div>
+    </div>
+  `;
+  frag.appendChild(card);
+  container.appendChild(frag);
+
+  (function fillDur() {
+    const sel = document.getElementById('task-duration');
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (let i = 0; i <= 1000; i++) {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = i + ' Hours';
+      sel.appendChild(opt);
+    }
+  })();
+
+  return container;
+}
+
+function createProfilePageFallback(containerId = 'page-profile') {
+  const container = document.getElementById(containerId);
+  if (!container) return null;
+  if (container.innerHTML.trim() !== '') return container;
+  const frag = document.createDocumentFragment();
+
+  const signedOut = document.createElement('div');
+  signedOut.id = 'profile-signedout';
+  signedOut.className = 'card form-card';
+  signedOut.innerHTML = `
+    <h3>Sign in / Sign up</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button id="google-signin" class="btn google-btn">Sign in with Google</button>
+      <button id="email-signin" class="btn ghost">Sign in (email)</button>
+      <button id="email-signup" class="btn">Sign up</button>
+    </div>
+
+    <div id="form-signin" style="margin-top:12px">
+      <h4>Sign in</h4>
+      <label>Email <input id="signin-email" type="email"/></label>
+      <label>Password <div class="input-wrap"><input id="signin-password" type="password"/><button class="pw-toggle" data-target="signin-password" aria-pressed="false">Show</button></div></label>
+      <div class="row gap">
+        <button id="signin-submit" class="btn">Sign in</button>
+        <button id="signin-cancel" class="btn ghost">Clear</button>
+        <a id="signin-forgot" href="#" class="link">Forgot?</a>
+      </div>
+      <div id="signin-status" class="meta small"></div>
+    </div>
+
+    <div id="form-signup" style="margin-top:12px">
+      <h4>Sign up</h4>
+      <label>Email <input id="signup-email" type="email"/></label>
+      <label>Password <input id="signup-password" type="password"/></label>
+      <label>Confirm <input id="signup-confirm" type="password"/></label>
+      <div class="row gap">
+        <button id="signup-submit" class="btn">Create account</button>
+        <button id="signup-cancel" class="btn ghost">Clear</button>
+      </div>
+      <div id="signup-status" class="meta small"></div>
+    </div>
+  `;
+  frag.appendChild(signedOut);
+
+  const signedIn = document.createElement('div');
+  signedIn.id = 'profile-signedin';
+  signedIn.className = 'card';
+  signedIn.style.marginTop = '12px';
+  signedIn.innerHTML = `
+    <h3>Account</h3>
+    <div class="profile-row">
+      <div class="avatar">👤</div>
+      <div style="flex:1">
+        <div id="profile-email" class="meta small"></div>
+        <div id="profile-uid" class="meta small"></div>
+      </div>
+    </div>
+    <label style="display:block;margin-top:8px">Display name <input id="profile-name-input" type="text"/></label>
+    <div class="row gap" style="margin-top:8px">
+      <button id="save-name-btn" class="btn">Save</button>
+      <button id="refresh-profile" class="btn ghost">Refresh</button>
+      <button id="signout-btn" class="btn ghost">Sign out</button>
+      <button id="clear-local" class="btn ghost">Clear local</button>
+    </div>
+    <div id="profile-save-status" class="meta small" style="margin-top:8px"></div>
+    <div id="verified-warning" style="margin-top:8px;display:none"></div>
+  `;
+  frag.appendChild(signedIn);
+
+  container.appendChild(frag);
+  return container;
+}
+
+function findMissingIds(ids){
+  return ids.filter(id => !document.getElementById(id));
+}
+
+const EXPECTED_IDS = [
+  // pages / nav
+  'page-home','page-add','page-profile','nav-home','nav-add','nav-profile',
+  // lists
+  'high-list','med-list','low-list','overdue-list','today-count',
+  // auth/profile nodes
+  'guest-note','user-email','auth-buttons','google-signin','email-signin','email-signup','account-btn',
+  'profile-signedin','profile-signedout','profile-email','profile-uid','profile-name-input',
+  'save-name-btn','refresh-profile','profile-save-status','signout-btn','clear-local','verified-warning',
+  // task form nodes
+  'task-title','task-notes','task-date','task-time','task-priority','task-duration','task-reminder',
+  'save-task','cancel-task','back-home',
+  // signin/signup
+  'form-signin','form-signup','signin-email','signin-password','signin-status','signin-submit','signin-forgot',
+  'signup-email','signup-password','signup-confirm','signup-status','signup-submit','signin-cancel','signup-cancel',
+  // template + toast
+  'task-template','toast'
+];
+
+
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    // safer $ helper that returns element or null
-    const $ = id => document.getElementById(id);
-
-    function uid(){ return Math.random().toString(36).slice(2,9); }
-    function nowISO(){ return new Date().toISOString(); }
-    function parseDueToDate(d){ if(!d) return null; if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d+'T23:59:59'); return new Date(d); }
-    function formatDueForDisplay(s){ if(!s) return ''; if(s.includes('T')) return s.replace('T',' '); return s; }
-
-    /* Toast */
-    const toastEl = $('toast');
-    let toastTimer = null;
-    function showToast(msg, type='info', ms=3000){
-      if(!toastEl){
-        // if toast element is missing, fallback to console (non-visual)
-        // but do not throw.
-        console.warn('toast element not found —', msg);
-        return;
-      }
-      toastEl.textContent = msg;
-      toastEl.style.background = (type === 'error') ? '#b91c1c' : (type === 'success' ? '#027a48' : '#111');
-      toastEl.style.opacity = '1';
-      if(toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(()=> { toastEl.style.opacity = '0'; }, ms);
+    // diagnostic
+    const missing = findMissingIds(EXPECTED_IDS);
+    if (missing.length) {
+      console.warn('MISSING IDS at startup — the app expected these IDs in your HTML:', missing);
+    } else {
+      console.log('All expected IDs present.');
     }
 
-    const STORAGE_KEY = 'organizeMe.tasks.v2';
-    let tasks = [];
-    let currentUser = null;
-    let syncTimeout = null;
-    let resendCooldown = false;
+    if (!document.getElementById('page-add') || !document.getElementById('task-title') || !document.getElementById('save-task')) {
+      console.warn('Add page appears incomplete — injecting fallback Add page markup (only if missing).');
+      createAddPageFallback('page-add');
+    }
+    if (!document.getElementById('page-profile') || !document.getElementById('profile-signedout') || !document.getElementById('profile-signedin')) {
+      console.warn('Profile page appears incomplete — injecting fallback Profile markup (only if missing).');
+      createProfilePageFallback('page-profile');
+    }
 
-    // grab DOM references (they may be null if your HTML differs; guarded below)
     const pageHome = $('page-home'), pageAdd = $('page-add'), pageProfile = $('page-profile');
     const navHome = $('nav-home'), navAdd = $('nav-add'), navProfile = $('nav-profile');
     const highList = $('high-list'), medList = $('med-list'), lowList = $('low-list'), overdueList = $('overdue-list');
@@ -99,41 +246,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const signinEmail = $('signin-email'), signinPassword = $('signin-password'), signinStatus = $('signin-status'), signinSubmit = $('signin-submit');
     const signupEmail = $('signup-email'), signupPassword = $('signup-password'), signupConfirm = $('signup-confirm'), signupStatus = $('signup-status'), signupSubmit = $('signup-submit');
     const taskTemplate = $('task-template');
+    const toastEl = $('toast');
 
-    // small required node check (non-throwing) — logs to console rather than crashing.
-    (function sanityCheck() {
-      const required = ['task-template','save-task','toast'];
-      required.forEach(id => { if(!$(id)) console.warn('Warning: DOM element missing: #' + id); });
-    })();
-
-    // replace duration input by select 0..1000 if it exists and has a parent
-    (function replaceDurationWithSelect(maxValue = 1000) {
-      const old = document.getElementById('task-duration');
-      if (!old || !old.parentNode) return;
-      const sel = document.createElement('select');
-      sel.id = old.id;
-      sel.name = old.name || old.id;
-      sel.className = old.className || '';
-      sel.setAttribute('aria-label', 'Estimated duration (hours)');
-
-      for (let i = 0; i <= maxValue; i++) {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = i + ' Hours';
-        sel.appendChild(opt);
+    /* Toast 🍞*/
+    let toastTimer = null;
+    function showToast(msg, type='info', ms=3000){
+      if(!toastEl){
+        console.warn('Toast missing —', msg);
+        return;
       }
+      toastEl.textContent = msg;
+      toastEl.style.background = (type === 'error') ? '#b91c1c' : (type === 'success' ? '#027a48' : '#111');
+      toastEl.style.opacity = '1';
+      if(toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=> { toastEl.style.opacity = '0'; }, ms);
+    }
 
-      try { old.parentNode.replaceChild(sel, old); }
-      catch(err){ console.warn('replaceDurationWithSelect failed', err); }
-    })(1000);
+    /* storage + state */
+    const STORAGE_KEY = 'organizeMe.tasks.v2';
+    let tasks = [];
+    let currentUser = null;
+    let syncTimeout = null;
+    let resendCooldown = false;
 
-    /* Storage */
     function loadLocal(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ tasks=[]; } }
     function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
 
     function dispatchChange() {
       window.dispatchEvent(new Event('OrganizeMeTasksChanged'));
-
       if (currentUser && currentUser.emailVerified) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(pushTasksToRemote, 900);
@@ -145,9 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Render logic */
     function render() {
       const showCompleted = showComplete ? showComplete.checked : false;
-
       let baseVisible = tasks.filter(t => showCompleted ? true : !t.done);
-
       const overdueArr = baseVisible.filter(t => isOverdue(t));
       const nonOverdue = baseVisible.filter(t => !isOverdue(t));
 
@@ -172,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      // count tasks due soon (2 days)
       const dueSoon = nonOverdue.filter(t => {
         if (!t.due) return false;
         const d = parseDueToDate(t.due);
@@ -181,13 +318,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }).length;
       if (todayCount) todayCount.textContent = `You have ${dueSoon} tasks due soon`;
 
-      // clear lists safely
       if (highList) highList.innerHTML = '';
       if (medList) medList.innerHTML = '';
       if (lowList) lowList.innerHTML = '';
       if (overdueList) overdueList.innerHTML = '';
 
-      // split into different priorities
       const high = nonOverdue.filter(t => t.priority === 'High');
       const med  = nonOverdue.filter(t => t.priority === 'Medium');
       const low  = nonOverdue.filter(t => t.priority === 'Low');
@@ -199,11 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function appendTasksTo(container, arr){
-      if(!container){
-        // missing container — don't throw, just log
-        console.warn('appendTasksTo: container missing', container);
-        return;
-      }
+      if(!container) return;
       if(!arr || !arr.length){
         const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No tasks yet!'; container.appendChild(e); return;
       }
@@ -222,7 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         node.setAttribute('data-priority', t.priority || 'Medium');
 
-        // overdue logic 
         const overdue = isOverdue(t);
         if (overdue) {
           node.classList.add('overdue');
@@ -232,7 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
           node.classList.remove('overdue');
         }
 
-        // done button
         const doneBtn = node.querySelector('.done-btn');
         if (doneBtn) {
           doneBtn.textContent = t.done ? 'Undo' : 'Done';
@@ -254,16 +383,14 @@ document.addEventListener('DOMContentLoaded', () => {
             calBtn.setAttribute('rel','noopener noreferrer');
             calBtn.textContent = 'Add to Calendar';
 
-            // build google calendar link
             const dates = googleDatesRangeForTask(t.due);
             if (dates) {
               const params = new URLSearchParams();
-              params.set('action','TEMPLATE'); // some browsers prefer this in path but this works
+              params.set('action','TEMPLATE');
               params.set('text', t.title || 'Task');
               if (t.notes) params.set('details', t.notes);
               params.set('dates', dates);
-              const href = 'https://calendar.google.com/calendar/render?' + params.toString();
-              calBtn.href = href;
+              calBtn.href = 'https://calendar.google.com/calendar/render?' + params.toString();
             } else {
               calBtn.href = '#';
               calBtn.addEventListener('click', (ev) => { ev.preventDefault(); showToast('Task has no due date to add to calendar', 'info'); });
@@ -296,21 +423,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const start = new Date(dueStr + 'T00:00:00');
         const end = new Date(start.getTime() + 1000 * 60 * 60 * 24);
         const fmt = dt => dt.toISOString().slice(0,10).replace(/-/g,'');
-        return `${fmt(start)}/${fmt(end)}`;
+        return `${fmt(start)}/{fmt(end)}`.replace('{fmt(end)}', fmt(end)); // fallback formula
       } else {
         const d = parse(dueStr);
         if (!d) return null;
-        const toUTCString = dt => {
-          // YYYYMMDDTHHMMSSZ (UTC)
-          return dt.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
-        };
+        const toUTCString = dt => dt.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
         const start = toUTCString(d);
-        const end = toUTCString(new Date(d.getTime() + 60 * 60 * 1000)); // +1 hour
+        const end = toUTCString(new Date(d.getTime() + 60 * 60 * 1000));
         return `${start}/${end}`;
       }
     }
-
-    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
     function addTaskLocal(data){
       const t = { id: data.id || uid(), title: data.title || 'Untitled', notes: data.notes||'', due: data.due||null, priority: data.priority||'Medium', duration: data.duration||null, reminder: !!data.reminder, done: !!data.done, createdAt: data.createdAt || nowISO() };
@@ -396,33 +518,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    /* Google login */
-    if (googleBtn) googleBtn.addEventListener('click', async ()=>{
-      try {
-        await signInWithPopup(auth, provider);
-        showToast('Signed in with Google', 'success');
-      } catch(e){
-        console.error('Google sign-in failed', e);
-        showToast('Google sign-in failed', 'error');
-      }
+    /* event wiring - guarded with existence checks */
+    if (googleBtn) googleBtn.addEventListener('click', async ()=> {
+      try { await signInWithPopup(auth, provider); showToast('Signed in with Google', 'success'); } catch(e){ console.error('Google sign-in failed', e); showToast('Google sign-in failed', 'error'); }
     });
-
-    if (emailSigninBtn) emailSigninBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signin'); });
-    if (emailSignupBtn) emailSignupBtn.addEventListener('click', ()=> { showPage('profile'); showEmailForms('signup'); });
+    if (emailSigninBtn) emailSigninBtn.addEventListener('click', ()=> { showPage('profile'); });
+    if (emailSignupBtn) emailSignupBtn.addEventListener('click', ()=> { showPage('profile'); });
     if (accountBtn) accountBtn.addEventListener('click', ()=> { showPage('profile'); });
 
     function showEmailForms(mode){
       if (profileSignedOut) profileSignedOut.style.display = '';
       if (profileSignedIn) profileSignedIn.style.display = 'none';
-      if(mode === 'signin' && signinEmail) signinEmail.focus(); else if (signupEmail) signupEmail.focus();
+      if(mode === 'signin' && signinEmail) signinEmail.focus();
       if (signinStatus) signinStatus.textContent = ''; if (signupStatus) signupStatus.textContent = '';
     }
 
-    /* sign-up */
-    if (signupSubmit) signupSubmit.addEventListener('click', async ()=>{
-      const em = signupEmail.value && signupEmail.value.trim();
-      const p1 = signupPassword.value;
-      const p2 = signupConfirm.value;
+    if (signupSubmit) signupSubmit.addEventListener('click', async () => {
+      const em = signupEmail && signupEmail.value && signupEmail.value.trim();
+      const p1 = signupPassword && signupPassword.value;
+      const p2 = signupConfirm && signupConfirm.value;
       if (signupStatus) signupStatus.textContent = '';
       if(!em || !p1){ if (signupStatus) signupStatus.textContent = 'Enter email and password'; return; }
       if(p1.length < 6){ if (signupStatus) signupStatus.textContent = 'Password must be at least 6 characters'; return; }
@@ -446,10 +560,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    /* sign-in */
-    if (signinSubmit) signinSubmit.addEventListener('click', async ()=>{
-      const em = signinEmail.value && signinEmail.value.trim();
-      const p = signinPassword.value;
+    if (signinSubmit) signinSubmit.addEventListener('click', async () => {
+      const em = signinEmail && signinEmail.value && signinEmail.value.trim();
+      const p = signinPassword && signinPassword.value;
       if (signinStatus) signinStatus.textContent = '';
       if(!em || !p){ if (signinStatus) signinStatus.textContent = 'Enter email and password'; return; }
       try {
@@ -467,50 +580,27 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    /* sign-out */
-    if (signoutBtn) signoutBtn.addEventListener('click', async ()=>{
-      try {
-        await signOut(auth);
-        showToast('Signed out', 'info');
-      } catch(e){ console.warn(e); showToast('Sign-out failed', 'error'); }
+    if (signoutBtn) signoutBtn.addEventListener('click', async ()=> {
+      try { await signOut(auth); showToast('Signed out', 'info'); } catch(e){ console.warn(e); showToast('Sign-out failed', 'error'); }
     });
 
-    /* resend verification helper */
     async function resendVerification(){
       if(!auth.currentUser) return showToast('Not signed in', 'error');
       if(resendCooldown) return showToast('Please wait before resending', 'info');
-      try {
-        await sendEmailVerification(auth.currentUser);
-        showToast('Verification email resent', 'success');
-        resendCooldown = true;
-        setTimeout(()=> { resendCooldown = false; }, 45_000);
-      } catch(e){
-        console.error('resend failed', e);
-        showToast('Failed to resend verification', 'error');
-      }
+      try { await sendEmailVerification(auth.currentUser); showToast('Verification email resent', 'success'); resendCooldown = true; setTimeout(()=> { resendCooldown = false; }, 45_000); } catch(e){ console.error('resend failed', e); showToast('Failed to resend verification', 'error'); }
     }
 
-    /* re-check verification email */
     async function checkVerifiedNow(){
       if(!auth.currentUser) return;
       try {
         await auth.currentUser.reload();
-        if(auth.currentUser.emailVerified){
-          showToast('Email verified! Sync enabled.', 'success');
-          updateAfterVerified();
-        } else {
-          showToast('Still not verified. Check your inbox.', 'info');
-        }
+        if(auth.currentUser.emailVerified){ showToast('Email verified! Sync enabled.', 'success'); updateAfterVerified(); } else { showToast('Still not verified. Check your inbox.', 'info'); }
       } catch(e){ console.warn(e); showToast('Verification check failed', 'error'); }
     }
 
     function updateAfterVerified(){
       const vw = $('verified-warning'); if (vw) vw.style.display = 'none';
-      if(currentUser && currentUser.emailVerified){
-        if(tasks && tasks.length) pushTasksToRemote();
-        else pushTasksToRemote();
-        showToast('Syncing tasks to remote', 'info');
-      }
+      if(currentUser && currentUser.emailVerified){ if(tasks && tasks.length) pushTasksToRemote(); else pushTasksToRemote(); showToast('Syncing tasks to remote', 'info'); }
     }
 
     document.addEventListener('click', (e) => {
@@ -535,16 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
           email = prompt('Enter the email to send password reset to:');
           if (!email) return;
         }
-        try {
-          await sendPasswordResetEmail(auth, email);
-          showToast('Password reset email sent — check your inbox', 'success', 6000);
-          if (signinStatus) signinStatus.textContent = 'Password reset email sent. Check inbox.';
-        } catch (err) {
-          console.error('sendPasswordResetEmail failed', err);
-          const msg = (err && err.message) ? err.message : 'Failed to send reset email';
-          showToast(msg, 'error', 5000);
-          if (signinStatus) signinStatus.textContent = msg;
-        }
+        try { await sendPasswordResetEmail(auth, email); showToast('Password reset email sent — check your inbox', 'success', 6000); if (signinStatus) signinStatus.textContent = 'Password reset email sent. Check inbox.'; } catch (err) { console.error('sendPasswordResetEmail failed', err); const msg = (err && err.message) ? err.message : 'Failed to send reset email'; showToast(msg, 'error', 5000); if (signinStatus) signinStatus.textContent = msg; }
       });
     }
 
@@ -643,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const rawDurEl = document.getElementById('task-duration');
       const rawDur = rawDurEl ? rawDurEl.value : '';
       const durNum = rawDur === '' ? null : Number(rawDur);
-      const duration = (durNum === 0) ? null : durNum; // treat 0 as "no value"
+      const duration = (durNum === 0) ? null : durNum;
 
       const item = {
         title,
@@ -684,27 +765,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if(profileNameInput && profileNameInput.value) applyDisplayNameToUI(profileNameInput.value);
     });
 
-    /* form cancel buttons */
     $('signin-cancel')?.addEventListener('click', ()=> { if (signinEmail) signinEmail.value=''; if (signinPassword) signinPassword.value=''; if (signinStatus) signinStatus.textContent=''; });
     $('signup-cancel')?.addEventListener('click', ()=> { if (signupEmail) signupEmail.value=''; if (signupPassword) signupPassword.value=''; if (signupConfirm) signupConfirm.value=''; if (signupStatus) signupStatus.textContent=''; });
 
     loadLocal(); render();
 
-    // register service worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then(reg => {
-        console.log('sw registered', reg);
-      }).catch(err => console.warn('sw reg failed', err));
+      navigator.serviceWorker.register('/sw.js').then(reg => { console.log('sw registered', reg); }).catch(err => console.warn('sw reg failed', err));
     }
 
-    // helper 
     async function requestNotificationPermission() {
       if (!('Notification' in window)) return false;
       const perm = await Notification.requestPermission();
       return perm === 'granted';
     }
-
-    // notification 
     async function showNotificationNow(title, options = {}) {
       if (navigator.serviceWorker && navigator.serviceWorker.ready) {
         const reg = await navigator.serviceWorker.ready;
@@ -715,7 +789,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('notifications not available or not permitted');
       }
     }
-
     async function testNotification() {
       const ok = await requestNotificationPermission();
       if (!ok) return showToast('Notifications permission denied', 'error');
@@ -724,6 +797,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.testNotification = testNotification;
 
   } catch (err) {
-    console.error('Initialization error (non-fatal):', err);
+    console.error('Fatal initialization error (caught):', err);
   }
 });
