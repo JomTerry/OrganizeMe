@@ -38,6 +38,7 @@
   </header>
 
   <main class="wrap app-main">
+    
     <!-- Home -->
     <section id="page-home" class="page">
       <div class="home-top card">
@@ -73,13 +74,14 @@
     </div>
 
 		<!-- Overdue tab para sa pasaway na crammers :P -->
-    <div class="section card-section">
-      <h3 class="section-title">Overdue</h3>
-      <div id="overdue-list" class="task-list"></div>
-    </div>
-  </div>
-</section> 
-
+		<div class="section card-section">
+  		<h3 class="section-title">Overdue</h3>
+  		<div id="overdue-list" class="task-list"></div>
+		  <div id="no-overdue-msg" class="meta" style="display:none; margin-top:6px;">
+  		  Good job! You have no overdue! 🥳
+		  </div>
+		</div>
+    
     <!-- Add Task -->
     <section id="page-add" class="page" style="display:none">
       <div class="card form-card">
@@ -245,7 +247,6 @@
     </div>
   </template>
 
-  <!-- tiny toast container -->
   <div id="toast" class="toast" aria-live="polite" style="display:none"></div>
 
   <script type="module" src="index.js" defer></script>
