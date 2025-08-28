@@ -4,236 +4,239 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OrganizeMe</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<header class="site-header" role="banner">
-  <div class="header-inner">
-    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
-      <div>
-        <h1 class="site-title">OrganizeMe</h1>
-        <div class="site-sub">Task manager — sync with Firebase</div>
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="logo">📋</div>
+        <div>
+          <h1 class="title">OrganizeMe</h1>
+          <div class="subtitle muted">Simple tasks, synced</div>
+        </div>
       </div>
 
-      <div class="auth-area">
-        <div class="auth-info">
-          <div id="guest-note" class="meta small">You are using a guest account</div>
-          <div id="user-email" class="meta small" style="display:none"></div>
-        </div>
+      <div class="header-right">
+        <div id="user-email" class="user-email" style="display:none"></div>
 
+        <!-- auth buttons placed top-right -->
         <div id="auth-buttons" class="auth-buttons">
-          <button id="google-signin" class="btn google-btn" title="Sign in with Google">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" />
-            Continue with Google
-          </button>
+          <button id="google-signin" class="btn small">Continue with Google</button>
+          <button id="email-signin" class="btn ghost small">Sign in</button>
+          <button id="email-signup" class="btn ghost small">Sign up</button>
+        </div>
 
-          <div class="email-actions">
-            <button id="email-signin" class="btn ghost">Sign in</button>
-            <button id="email-signup" class="btn ghost">Sign up</button>
+        <button id="account-btn" class="btn ghost" style="display:none">Account</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAV (compact row below header) -->
+  <nav class="main-nav">
+    <div class="container nav-inner">
+      <button id="nav-home" class="nav-item active">Home</button>
+      <button id="nav-add" class="nav-item">Add</button>
+      <button id="nav-profile" class="nav-item">Profile</button>
+    </div>
+  </nav>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- PAGES -->
+  <main class="container app-main">
+
+    <!-- HOME PAGE -->
+    <section id="page-home" class="page page-home">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Tasks</h2>
+          <div id="today-count" class="muted">You have 0 tasks due soon</div>
+        </div>
+
+        <div class="lists-row">
+          <div class="list-col">
+            <h3>High</h3>
+            <div id="high-list" class="task-list"></div>
+          </div>
+          <div class="list-col">
+            <h3>Medium</h3>
+            <div id="med-list" class="task-list"></div>
+          </div>
+          <div class="list-col">
+            <h3>Low</h3>
+            <div id="low-list" class="task-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADD PAGE -->
+    <section id="page-add" class="page page-add" style="display:none">
+      <form class="panel form-panel" onsubmit="return false;">
+        <div class="panel-head">
+          <h2>Add Task</h2>
+        </div>
+
+        <div class="form-row">
+          <label for="task-title">Title</label>
+          <input id="task-title" type="text" placeholder="Task title" autocomplete="off" required>
+        </div>
+
+        <div class="form-row">
+          <label for="task-notes">Notes</label>
+          <textarea id="task-notes" rows="4" placeholder="Optional notes..."></textarea>
+        </div>
+
+        <div class="form-row group-row">
+          <div class="small-field">
+            <label for="task-date">Date</label>
+            <input id="task-date" type="date">
+          </div>
+
+          <div class="small-field">
+            <label for="task-time">Time</label>
+            <input id="task-time" type="time">
+          </div>
+
+          <div class="small-field">
+            <label for="task-duration">Hours</label>
+            <input id="task-duration" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal">
+          </div>
+
+          <div class="small-field">
+            <label for="task-priority">Priority</label>
+            <select id="task-priority">
+              <option>Medium</option>
+              <option>High</option>
+              <option>Low</option>
+            </select>
           </div>
         </div>
 
-        <button id="account-btn" class="btn ghost" style="display:none">Profile</button>
-      </div>
-    </div>
-  </div>
-</header>
-
-<main class="wrap app-main" id="app" role="main">
-
-  <!-- HOME -->
-  <section id="page-home" class="card home-top">
-    <div class="row gap" style="align-items:center;justify-content:space-between">
-      <div>
-        <div id="greeting"><strong>Welcome!</strong></div>
-        <div id="today-count" class="meta small">Loading…</div>
-      </div>
-
-      <div class="controls">
-        <label class="small">Sort:
-          <select id="sort-mode">
-            <option value="priority">Priority then due</option>
-            <option value="date">Earliest due</option>
-          </select>
-        </label>
-        <label class="small"><input id="show-complete" type="checkbox" /> Show completed</label>
-      </div>
-    </div>
-
-    <div id="sections" style="margin-top:12px">
-      <section class="card-section card">
-        <h3>High priority</h3>
-        <div id="high-list" class="task-list"></div>
-      </section>
-
-      <section class="card-section card">
-        <h3>Medium priority</h3>
-        <div id="med-list" class="task-list"></div>
-      </section>
-
-      <section class="card-section card">
-        <h3>Low priority</h3>
-        <div id="low-list" class="task-list"></div>
-      </section>
-    </div>
-  </section>
-
-  <!-- ADD TASK -->
-  <section id="page-add" class="card form-card" style="display:none">
-    <h3>Add task</h3>
-    <div class="row" style="flex-direction:column;gap:10px">
-      <label>Task
-        <input id="task-title" placeholder="e.g. Finish report" />
-      </label>
-
-      <label>Notes
-        <textarea id="task-notes" placeholder="Optional notes"></textarea>
-      </label>
-
-      <div class="row gap">
-        <label>Due date
-          <input id="task-date" type="date" />
-        </label>
-        <label>Due time
-          <input id="task-time" type="time" />
-        </label>
-      </div>
-
-      <div class="row gap">
-        <label>Priority
-          <select id="task-priority">
-            <option value="High">High</option>
-            <option value="Medium" selected>Medium</option>
-            <option value="Low">Low</option>
-          </select>
-        </label>
-
-        <label>Duration (h)
-          <input id="task-duration" type="number" min="0" step="0.5" />
-        </label>
-
-        <label>Reminder
-          <input id="task-reminder" type="checkbox" />
-        </label>
-      </div>
-
-      <div class="row gap">
-        <button id="save-task" class="btn">Save</button>
-        <button id="cancel-task" class="btn ghost">Cancel</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- PROFILE -->
-  <section id="page-profile" class="card" style="display:none">
-    <h3>Profile</h3>
-
-    <div id="profile-signedin" style="display:none">
-      <div class="profile-row">
-        <div style="flex:1">
-          <div class="meta">Email: <span id="profile-email"></span></div>
-          <div class="meta">UID: <span id="profile-uid"></span></div>
-          <div style="margin-top:8px">
-            <label>Display name
-              <input id="profile-name-input" />
-            </label>
-            <div class="row gap" style="margin-top:8px">
-              <button id="save-name-btn" class="btn">Save name</button>
-              <button id="refresh-profile" class="btn ghost">Refresh</button>
-              <span id="profile-save-status" class="meta small"></span>
-            </div>
-          </div>
+        <div class="form-row">
+          <label class="inline"><input id="task-reminder" type="checkbox"> Reminder</label>
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-          <button id="signout-btn" class="btn ghost">Sign out</button>
-          <button id="clear-local" class="btn ghost">Clear local</button>
+        <div class="form-row actions">
+          <button id="save-task" class="btn">Save Task</button>
+          <button id="cancel-task" class="btn ghost">Cancel</button>
+          <button id="back-home" class="btn ghost">Back</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- PROFILE PAGE -->
+    <section id="page-profile" class="page page-profile" style="display:none">
+      <div class="panel form-panel">
+        <div class="panel-head">
+          <h2>Profile & Sign-in</h2>
+        </div>
+
+        <div id="guest-note" class="muted">Sign in to sync tasks across devices.</div>
+
+        <div id="profile-signedout">
+          <form id="form-signin" onsubmit="return false;">
+            <h3>Sign in</h3>
+
+            <div class="form-row">
+              <label for="signin-email">Email</label>
+              <input id="signin-email" type="email" autocomplete="email" placeholder="you@example.com">
+            </div>
+
+            <div class="form-row input-wrap">
+              <label for="signin-password">Password</label>
+              <input id="signin-password" type="password" autocomplete="current-password" placeholder="Password">
+              <button class="pw-toggle" type="button" data-target="signin-password" aria-pressed="false" title="Show password">
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 110-10 5 5 0 010 10z"/></svg>
+              </button>
+            </div>
+
+            <div class="form-row small-actions">
+              <button id="signin-submit" class="btn">Sign in</button>
+              <a id="signin-forgot" href="#" class="link">Forgot password?</a>
+              <span id="signin-status" class="muted status-text"></span>
+            </div>
+          </form>
+
+          <hr>
+
+          <form id="form-signup" onsubmit="return false;">
+            <h3>Create account</h3>
+
+            <div class="form-row">
+              <label for="signup-email">Email</label>
+              <input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com">
+            </div>
+
+            <div class="form-row input-wrap">
+              <label for="signup-password">Password</label>
+              <input id="signup-password" type="password" autocomplete="new-password" placeholder="Password (min 6)">
+              <button class="pw-toggle" type="button" data-target="signup-password" aria-pressed="false" title="Show password">
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 110-10 5 5 0 010 10z"/></svg>
+              </button>
+            </div>
+
+            <div class="form-row input-wrap">
+              <label for="signup-confirm">Confirm password</label>
+              <input id="signup-confirm" type="password" autocomplete="new-password" placeholder="Confirm password">
+              <button class="pw-toggle" type="button" data-target="signup-confirm" aria-pressed="false" title="Show password">
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 110-10 5 5 0 010 10z"/></svg>
+              </button>
+            </div>
+
+            <div class="form-row small-actions">
+              <button id="signup-submit" class="btn">Create account</button>
+              <span id="signup-status" class="muted status-text"></span>
+            </div>
+          </form>
+        </div>
+
+        <div id="profile-signedin" style="display:none">
+          <h3>Your profile</h3>
+          <div class="form-row">
+            <label>Email</label>
+            <div id="profile-email" class="muted"></div>
+          </div>
+
+          <div class="form-row">
+            <label for="profile-name-input">Display name</label>
+            <input id="profile-name-input" type="text" placeholder="Your name">
+          </div>
+
+          <div class="form-row small-actions">
+            <button id="save-name-btn" class="btn">Save</button>
+            <button id="refresh-profile" class="btn ghost">Refresh</button>
+            <span id="profile-save-status" class="muted"></span>
+          </div>
+
+          <div class="form-row small-actions">
+            <button id="signout-btn" class="btn ghost">Sign out</button>
+            <button id="clear-local" class="btn ghost">Clear local</button>
+          </div>
         </div>
       </div>
-      <div id="verified-warning" style="margin-top:12px;display:none"></div>
-    </div>
+    </section>
 
-    <div id="profile-signedout" style="display:block">
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
-        <!-- SIGNIN FORM -->
-        <form id="form-signin" class="form-card" onsubmit="return false" style="min-width:260px;padding:10px">
-          <h4>Sign in (email)</h4>
-          <label>Email
-            <input id="signin-email" type="email" />
-          </label>
-          <label>Password
-            <div style="display:flex;gap:8px">
-              <input id="signin-password" type="password" />
-              <button type="button" class="pw-toggle btn ghost small" data-target="signin-password" aria-pressed="false">👁</button>
-            </div>
-          </label>
+  </main>
 
-          <div class="row" style="margin-top:8px">
-            <button id="signin-submit" class="btn">Sign in</button>
-            <button id="signin-cancel" class="btn ghost">Cancel</button>
-            <button id="signin-forgot" class="btn ghost small">Forgot?</button>
-          </div>
-          <div id="signin-status" class="meta small" style="margin-top:8px"></div>
-        </form>
-
-        <!-- SIGNUP FORM -->
-        <form id="form-signup" class="form-card" onsubmit="return false" style="min-width:260px;padding:10px">
-          <h4>Sign up (email)</h4>
-          <label>Email
-            <input id="signup-email" type="email" />
-          </label>
-          <label>Password
-            <div style="display:flex;gap:8px">
-              <input id="signup-password" type="password" />
-              <button type="button" class="pw-toggle btn ghost small" data-target="signup-password" aria-pressed="false">👁</button>
-            </div>
-          </label>
-          <label>Confirm password
-            <div style="display:flex;gap:8px">
-              <input id="signup-confirm" type="password" />
-              <button type="button" class="pw-toggle btn ghost small" data-target="signup-confirm" aria-pressed="false">👁</button>
-            </div>
-          </label>
-
-          <div class="row" style="margin-top:8px">
-            <button id="signup-submit" class="btn">Create</button>
-            <button id="signup-cancel" class="btn ghost">Cancel</button>
-          </div>
-          <div id="signup-status" class="meta small" style="margin-top:8px"></div>
-        </form>
+  <!-- TASK TEMPLATE used by JS -->
+  <template id="task-template">
+    <div class="task-item">
+      <div class="task-left">
+        <div class="task-title">Untitled</div>
+        <div class="task-meta muted"></div>
+      </div>
+      <div class="task-actions">
+        <button class="done-btn btn small">Done</button>
+        <button class="edit-btn btn ghost small">Edit</button>
+        <button class="del-btn btn ghost small">Delete</button>
       </div>
     </div>
-  </section>
+  </template>
 
-</main>
-
-<!-- Task template -->
-<template id="task-template">
-  <div class="task">
-    <div>
-      <div class="task-title"></div>
-      <div class="task-meta meta"></div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="done-btn btn small">Done</button>
-      <button class="edit-btn btn ghost small">Edit</button>
-      <button class="del-btn btn ghost small">Delete</button>
-    </div>
-  </div>
-</template>
-
-<!-- bottom nav -->
-<nav class="bottom-nav" role="navigation" aria-label="Main">
-  <button id="nav-home" class="nav-btn active">Home</button>
-  <button id="nav-add" class="nav-btn">Add</button>
-  <button id="nav-profile" class="nav-btn">Profile</button>
-</nav>
-
-<!-- small toast -->
-<div id="toast" class="toast" aria-live="polite" role="status"></div>
-
-<!-- module -->
-<script type="module" src="index.js" defer></script>
+  <script type="module" src="index.js"></script>
 </body>
 </html>
