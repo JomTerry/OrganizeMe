@@ -240,7 +240,7 @@ button{font:inherit}
 .gap{gap:8px}
 .link{color:var(--accent); text-decoration:none}
 
-/* Overdue visual */
+/* Overdue visual para sa pasaway*/
 :root {
   --overdue-accent: #8b0000;
   --overdue-bg: linear-gradient(90deg, rgba(139, 0, 0, 0.15), rgba(255, 230, 230, 0.08));
