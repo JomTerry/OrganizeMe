@@ -704,3 +704,36 @@ $('signup-cancel')?.addEventListener('click', ()=> { signupEmail.value=''; signu
 
 /* initial load */
 loadLocal(); render();
+
+// register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    console.log('sw registered', reg);
+  }).catch(err => console.warn('sw reg failed', err));
+}
+
+// helper 
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  const perm = await Notification.requestPermission();
+  return perm === 'granted';
+}
+
+// notification 
+async function showNotificationNow(title, options = {}) {
+  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification(title, options);
+  } else if (window.Notification && Notification.permission === 'granted') {
+    new Notification(title, options);
+  } else {
+    console.warn('notifications not available or not permitted');
+  }
+}
+
+async function testNotification() {
+  const ok = await requestNotificationPermission();
+  if (!ok) return showToast('Notifications permission denied', 'error');
+  showNotificationNow('OrganizeMe — test', { body: 'This is a test notification from your local app.' });
+}
+window.testNotification = testNotification;
