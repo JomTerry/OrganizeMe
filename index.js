@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const opt = document.createElement('option');
     opt.value = String(i);
     if (i === 0) {
-      opt.textContent = '0 hours (default)';
+      opt.textContent = '0 hours';
       opt.selected = true;
     } else if (i === 1) {
       opt.textContent = '1 hour';
@@ -212,6 +212,18 @@ document.addEventListener('DOMContentLoaded', () => {
     sel.appendChild(opt);
   }
 })();
+
+	const durationSelect = document.getElementById("task-duration");
+	if (durationSelect) {
+ 	 for (let i = 0; i <= 1000; i++) {
+  	  const option = document.createElement("option");
+      option.value = i;
+    	option.textContent = i === 0 ? "0 hours (none)" : 
+      	                   i === 1 ? "1 hour" : 
+       	                  `${i} hours`;
+	    durationSelect.appendChild(option);
+ 	 }
+	}
 
   try {
     // diagnostic
