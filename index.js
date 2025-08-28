@@ -172,16 +172,103 @@ function appendTasksTo(container, arr){
     node.querySelector('.task-title').textContent = t.title;
     const metaParts = [];
     if(t.due) metaParts.push(formatDueForDisplay(t.due));
-		if (t.duration != null) metaParts.push(`${t.duration} Hours`);
+    if (t.duration != null) metaParts.push(`${t.duration} Hours`);
     node.querySelector('.task-meta').innerHTML = metaParts.join(' • ') + (t.notes ? ` • ${escapeHtml(t.notes)}` : '');
+
+    // mark priority as before
     node.setAttribute('data-priority', t.priority || 'Medium');
+
+    // === overdue logic ===
+    const overdue = isOverdue(t);
+    if (overdue) {
+      node.classList.add('overdue');
+      node.setAttribute('data-overdue', 'true');
+    } else {
+      node.removeAttribute('data-overdue');
+      node.classList.remove('overdue');
+    }
+
+    // done button
     const doneBtn = node.querySelector('.done-btn');
     doneBtn.textContent = t.done ? 'Undo' : 'Done';
     doneBtn.onclick = ()=>{ t.done = !t.done; dispatchChange(); render(); };
+
+    // Edit / Delete wiring
     node.querySelector('.edit-btn').onclick = ()=> openEdit(t);
     node.querySelector('.del-btn').onclick = ()=> { if(confirm('Delete task?')){ tasks = tasks.filter(x=>x.id!==t.id); dispatchChange(); render(); } };
+
+    // === Add-to-Calendar button (insert before edit button) ===
+    try {
+      const actions = node.querySelector('.task-actions');
+      if (actions) {
+        // create button element
+        const calBtn = document.createElement('a');
+        calBtn.className = 'btn ghost small cal-btn';
+        calBtn.setAttribute('role','button');
+        calBtn.setAttribute('target','_blank');
+        calBtn.setAttribute('rel','noopener noreferrer');
+        calBtn.textContent = 'Add to Calendar';
+
+        // build google calendar link
+        const dates = googleDatesRangeForTask(t.due);
+        if (dates) {
+          const params = new URLSearchParams();
+          params.set('action','TEMPLATE'); // some browsers prefer this in path but this works
+          params.set('text', t.title || 'Task');
+          if (t.notes) params.set('details', t.notes);
+          params.set('dates', dates);
+          const href = 'https://calendar.google.com/calendar/render?' + params.toString();
+          calBtn.href = href;
+        } else {
+          calBtn.href = '#';
+          calBtn.addEventListener('click', (ev) => { ev.preventDefault(); showToast('Task has no due date to add to calendar', 'info'); });
+        }
+
+        // insert before edit button (if found) otherwise append
+        const editBtn = node.querySelector('.edit-btn');
+        if (editBtn) actions.insertBefore(calBtn, editBtn);
+        else actions.appendChild(calBtn);
+      }
+    } catch(err) {
+      // don't break the rendering if calendar part fails
+      console.warn('failed to add calendar button', err);
+    }
+
     container.appendChild(node);
   });
+}
+
+// ------- helpers for overdue + calendar --------
+function isOverdue(task) {
+  if (!task || !task.due) return false;
+  // parseDueToDate already treats YYYY-MM-DD as end-of-day
+  const d = parseDueToDate(task.due);
+  if (!d) return false;
+  return d.getTime() < Date.now() && !task.done;
+}
+
+function googleDatesRangeForTask(dueStr) {
+  if (!dueStr) return null;
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(dueStr);
+  const parse = parseDueToDate;
+  if (isDateOnly) {
+    // all-day event: start = date, end = next day (Google expects end exclusive)
+    const start = new Date(dueStr + 'T00:00:00');
+    const end = new Date(start.getTime() + 1000 * 60 * 60 * 24);
+    const fmt = dt => dt.toISOString().slice(0,10).replace(/-/g,'');
+    return `${fmt(start)}/${fmt(end)}`;
+  } else {
+    // timed event: use the provided datetime; default duration 1 hour
+    const d = parse(dueStr);
+    if (!d) return null;
+    const toUTCString = dt => {
+      // YYYYMMDDTHHMMSSZ (UTC)
+      return dt.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+    };
+    const start = toUTCString(d);
+    const end = toUTCString(new Date(d.getTime() + 60 * 60 * 1000)); // +1 hour
+    return `${start}/${end}`;
+  }
 }
 
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
