@@ -10,15 +10,16 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getDatabase,
-  ref,
-  onValue,
-  set,
-  get,
-  child
+	  getDatabase,
+    ref,
+  	onValue,
+  	set,
+  	get,
+  	child
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 /* ========== CONFIG - replace if you wish ========== */
@@ -376,6 +377,53 @@ function updateAfterVerified(){
   }
 }
 
+/* ===========================
+   Password visibility toggles
+   =========================== */
+// Wire up any .pw-toggle buttons present in DOM
+document.addEventListener('click', (e) => {
+  // Delegation: if a pw-toggle was clicked
+  const btn = e.target.closest && e.target.closest('.pw-toggle');
+  if (!btn) return;
+  const targetId = btn.dataset && btn.dataset.target;
+  if (!targetId) return;
+  const input = document.getElementById(targetId);
+  if (!input) return;
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+  // optional: change inner icon to eye/eye-off - here we just flip color via aria-pressed
+  input.focus();
+});
+
+/* ===========================
+   Forgot / reset password
+   =========================== */
+const signinForgotEl = $('signin-forgot');
+if (signinForgotEl) {
+  signinForgotEl.addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    // prefer the email typed into the signin box
+    let email = (signinEmail && signinEmail.value && signinEmail.value.trim()) || '';
+    if (!email) {
+      // prompt if empty
+      email = prompt('Enter the email to send password reset to:');
+      if (!email) return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showToast('Password reset email sent — check your inbox', 'success', 6000);
+      // give a visible confirmation near signin status (if shown)
+      if (signinStatus) signinStatus.textContent = 'Password reset email sent. Check inbox.';
+    } catch (err) {
+      console.error('sendPasswordResetEmail failed', err);
+      const msg = (err && err.message) ? err.message : 'Failed to send reset email';
+      showToast(msg, 'error', 5000);
+      if (signinStatus) signinStatus.textContent = msg;
+    }
+  });
+}
+
 /* Listen to auth state changes */
 onAuthStateChanged(auth, async user => {
   currentUser = user;
@@ -458,7 +506,9 @@ function showPage(name){
   pageProfile.style.display = name==='profile' ? '' : 'none';
   setActiveNav(name);
 }
-backHomeBtn.addEventListener('click', ()=> showPage('home'));
+if (backHomeBtn) {
+  backHomeBtn.addEventListener('click', ()=> showPage('home'));
+}
 navHome.click();
 
 /* Add task form */
