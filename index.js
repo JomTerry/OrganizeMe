@@ -800,9 +800,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadLocal(); render();
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then(reg => { console.log('sw registered', reg); }).catch(err => console.warn('sw reg failed', err));
-    }
+		if ('serviceWorker' in navigator) {
+  		navigator.serviceWorker.register('sw.js')
+    		.then(reg => console.log('sw registered', reg))
+		    .catch(err => console.warn('sw reg failed', err));
+		}
 
     async function requestNotificationPermission() {
       if (!('Notification' in window)) return false;
