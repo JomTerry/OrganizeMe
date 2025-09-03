@@ -1,4 +1,3 @@
-// sw.js — minimal service worker for notifications
 self.addEventListener('install', (evt) => {
   self.skipWaiting();
 });
