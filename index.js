@@ -35,6 +35,56 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getDatabase(app);
 
+import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js';
+
+const messaging = getMessaging(app);
+
+async function enableWebPushForCurrentUser(vapidKey) {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service worker not supported — push unavailable');
+    return null;
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('SW registered for messaging:', reg);
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.warn('Notification permission not granted');
+      return null;
+    }
+
+    const fcmToken = await getToken(messaging, {
+      vapidKey: vapidKey,
+      serviceWorkerRegistration: reg
+    });
+
+    console.log('FCM token:', fcmToken);
+    showToast('Push enabled', 'success');
+
+    if (fcmToken && currentUser) {
+      try {
+        await set(ref(db, `users/${currentUser.uid}/fcmTokens/${fcmToken}`), true);
+      } catch (e) {
+        console.warn('failed to store fcm token in db', e);
+      }
+    }
+    return fcmToken;
+  } catch (err) {
+    console.error('enableWebPushForCurrentUser failed', err);
+    showToast('Push setup failed', 'error');
+    return null;
+  }
+}
+
+onMessage(messaging, (payload) => {
+  console.log('Foreground push received', payload);
+  const title = payload?.notification?.title || 'Notification';
+  const body = payload?.notification?.body || JSON.stringify(payload);
+  showToast(`${title}: ${body}`, 'info', 6000);
+});
+
 const $ = id => document.getElementById(id);
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function nowISO(){ return new Date().toISOString(); }
@@ -45,7 +95,7 @@ function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;'
 function createAddPageFallback(containerId = 'page-add') {
   const container = document.getElementById(containerId);
   if (!container) return null;
-  if (container.innerHTML.trim() !== '') return container; // already has content
+  if (container.innerHTML.trim() !== '') return container; 
   const frag = document.createDocumentFragment();
 
   const card = document.createElement('div');
@@ -173,21 +223,15 @@ function findMissingIds(ids){
 }
 
 const EXPECTED_IDS = [
-  // pages / nav
   'page-home','page-add','page-profile','nav-home','nav-add','nav-profile',
-  // lists
   'high-list','med-list','low-list','overdue-list','today-count',
-  // auth/profile nodes
   'guest-note','user-email','auth-buttons','google-signin','email-signin','email-signup','account-btn',
   'profile-signedin','profile-signedout','profile-email','profile-uid','profile-name-input',
   'save-name-btn','refresh-profile','profile-save-status','signout-btn','clear-local','verified-warning',
-  // task form nodes
   'task-title','task-notes','task-date','task-time','task-priority','task-duration','task-reminder',
   'save-task','cancel-task','back-home',
-  // signin/signup
   'form-signin','form-signup','signin-email','signin-password','signin-status','signin-submit','signin-forgot',
   'signup-email','signup-password','signup-confirm','signup-status','signup-submit','signin-cancel','signup-cancel',
-  // template + toast
   'task-template','toast'
 ];
 
@@ -226,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
   try {
-    // diagnostic
     const missing = findMissingIds(EXPECTED_IDS);
     if (missing.length) {
       console.warn('MISSING IDS at startup — the app expected these IDs in your HTML:', missing);
@@ -301,7 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    /* Render logic */
     function render() {
       const showCompleted = showComplete ? showComplete.checked : false;
       let baseVisible = tasks.filter(t => showCompleted ? true : !t.done);
@@ -454,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const start = new Date(dueStr + 'T00:00:00');
         const end = new Date(start.getTime() + 1000 * 60 * 60 * 24);
         const fmt = dt => dt.toISOString().slice(0,10).replace(/-/g,'');
-        return `${fmt(start)}/{fmt(end)}`.replace('{fmt(end)}', fmt(end)); // fallback formula
+        return `${fmt(start)}/{fmt(end)}`.replace('{fmt(end)}', fmt(end)); 
       } else {
         const d = parse(dueStr);
         if (!d) return null;
