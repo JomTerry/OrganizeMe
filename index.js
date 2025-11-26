@@ -130,9 +130,6 @@ function createAddPageFallback(containerId = 'page-add') {
         </label>
       </div>
       <label class="row toggle-row">
-        <span>Reminder</span>
-        <input id="task-reminder" type="checkbox" />
-      </label>
       <div class="row gap">
         <button id="save-task" class="btn">Save</button>
         <button id="cancel-task" class="btn ghost">Cancel</button>
