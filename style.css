@@ -24,7 +24,6 @@ html,body{
 }
 .wrap{max-width:980px;margin:18px auto;padding:0 16px}
 
-/* Header (Blue bc I love blue) */
 header.site-header{
   background: linear-gradient(90deg,#0b63d6 0%, #2a9df4 100%);
   color: #ffffff;
@@ -87,7 +86,6 @@ header.site-header{
 
 .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
 
-/* layout */
 .app-main{margin-top:14px;display:flex;flex-direction:column;gap:12px}
 
 .home-top{display:flex;flex-direction:column;gap:8px;padding:12px}
@@ -95,11 +93,9 @@ header.site-header{
 .small{font-size:13px}
 .meta{font-size:13px;color:var(--muted)}
 
-/* vertical */
 #sections{display:flex;flex-direction:column;gap:12px}
 .card-section{padding:12px}
 
-/* task list */
 .task-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .task{
   display:flex;
@@ -111,7 +107,6 @@ header.site-header{
   background:#fafafa
 }
 
-/* priority visuals on task node */
 .task[data-priority="High"]{background:var(--high);border-left:6px solid var(--high-accent)}
 .task[data-priority="Medium"]{background:var(--med);border-left:6px solid var(--med-accent)}
 .task[data-priority="Low"]{background:var(--low);border-left:6px solid var(--low-accent)}
@@ -119,7 +114,6 @@ header.site-header{
 .task-title{font-weight:600}
 .task-meta{font-size:13px;color:var(--muted)}
 
-/* buttons */
 button{font:inherit}
 .btn{
   background:var(--accent);
@@ -146,7 +140,6 @@ button{font:inherit}
 }
 .btn.google-btn img{height:18px}
 
-/* form card */
 .form-card input, 
 .form-card textarea, 
 .form-card select{
@@ -202,7 +195,6 @@ button{font:inherit}
 
 .empty{text-align:center;color:var(--muted);padding:18px}
 
-/* profile */
 .profile-row{display:flex;gap:12px;align-items:center}
 .profile-row .avatar{
   font-size:34px;
@@ -215,7 +207,6 @@ button{font:inherit}
   background:#f2f6fb
 }
 
-/* toast */
 .toast{
   position:fixed;
   left:50%;
@@ -240,24 +231,21 @@ button{font:inherit}
 .gap{gap:8px}
 .link{color:var(--accent); text-decoration:none}
 
-/* Overdue visual para sa pasaway*/
 :root {
   --overdue-accent: #8b0000;
   --overdue-bg: linear-gradient(90deg, rgba(139, 0, 0, 0.15), rgba(255, 230, 230, 0.08));
 }
 
-#overdue-list .task,
 .task.overdue {
   border-left: 6px solid var(--overdue-accent) !important;
   background: var(--overdue-bg) !important;
   color: var(--overdue-accent);
 }
 
-#overdue-list .task .task-title,
 .task.overdue .task-title {
   color: var(--overdue-accent) !important;
 }
-#overdue-list .task .task-meta,
+
 .task.overdue .task-meta {
   color: rgba(107,18,18,0.95) !important;
 }
@@ -287,14 +275,12 @@ button{font:inherit}
 
 .task .done-btn { background: var(--accent); color: #fff; border: 0; }
 
-#overdue-list .task .done-btn,
 .task.overdue .done-btn {
   background: var(--overdue-accent) !important;
   color: #fff !important;
   border: 0;
 }
 
-#overdue-list .task .edit-btn,
 .task.overdue .edit-btn {
   background: #fff !important;
   color: var(--overdue-accent) !important;
@@ -302,7 +288,6 @@ button{font:inherit}
   box-shadow: 0 1px 2px rgba(107,18,18,0.03);
 }
 
-#overdue-list .task .del-btn,
 .task.overdue .del-btn {
   background: transparent !important;
   color: var(--overdue-accent) !important;
