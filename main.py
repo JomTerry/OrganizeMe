@@ -14,7 +14,7 @@ class WebViewApp(App):
     def build(self):
         if platform == "android" and autoclass is not None:
             self._create_webview()
-            return Label(text="")  # placeholder; native WebView becomes visible
+            return Label(text="")
         else:
             return Label(text="This app is intended to run on Android. Open index.html in a browser to preview.")
 
@@ -34,7 +34,6 @@ class WebViewApp(App):
 
                 webview = WebView(activity)
 
-                # Enable debugging for chrome://inspect
                 try:
                     WebView.setWebContentsDebuggingEnabled(True)
                 except Exception:
