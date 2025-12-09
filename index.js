@@ -585,7 +585,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    /* event wiring - guarded with existence checks */
     if (googleBtn) googleBtn.addEventListener('click', async ()=> {
       try { await signInWithPopup(auth, provider); showToast('Signed in with Google', 'success'); } catch(e){ console.error('Google sign-in failed', e); showToast('Google sign-in failed', 'error'); }
     });
