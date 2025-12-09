@@ -319,7 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
       toastTimer = setTimeout(()=> { toastEl.style.opacity = '0'; }, ms);
     }
 
-    /* storage + state */
     const STORAGE_KEY = 'organizeMe.tasks.v2';
     let tasks = [];
     let currentUser = null;
