@@ -44,12 +44,10 @@ class WebViewApp(App):
                 settings.setJavaScriptEnabled(True)
                 settings.setDomStorageEnabled(True)
                 settings.setAllowFileAccess(True)
-                # allow universal access from file URLs (needed for file:///android_asset to fetch remote scripts)
                 try:
                     settings.setAllowUniversalAccessFromFileURLs(True)
                 except Exception:
                     pass
-                # Mixed content mode (if supported)
                 try:
                     MIXED = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                     settings.setMixedContentMode(MIXED)
