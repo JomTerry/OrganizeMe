@@ -1,4 +1,3 @@
-// Firebase web SDK v10 imports
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth,
@@ -307,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskTemplate = $('task-template');
     const toastEl = $('toast');
 
-    /* Toast 🍞*/
     let toastTimer = null;
     function showToast(msg, type='info', ms=3000){
       if(!toastEl){
