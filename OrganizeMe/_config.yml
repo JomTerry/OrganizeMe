@@ -3,19 +3,26 @@ description: ""
 
 exclude:
   - node_modules
+  - "**/node_modules/**"
+  - "**/node_modules"
+  - "**/*.md"
+  - "**/*.MD"
+  - "**/*.markdown"
+  - android
+  - ios
+  - build
+  - dist
+  - public
   - package.json
   - package-lock.json
   - yarn.lock
   - pnpm-lock.yaml
   - README.md
-  - android
-  - ios
-  - dist
-  - build
-  - public
+  - README.MD
   - .github
-  - .gitignore
 
 liquid:
   error_mode: warn
   strict_filters: false
+
+markdown_ext: ""
